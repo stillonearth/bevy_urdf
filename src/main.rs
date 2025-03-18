@@ -1,59 +1,77 @@
-// disable console on windows for release builds
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+mod events;
+mod plugin;
+mod urdf_asset_loader;
 
-use bevy::asset::AssetMetaCheck;
-use bevy::prelude::*;
-use bevy::window::PrimaryWindow;
-use bevy::winit::WinitWindows;
-use bevy::DefaultPlugins;
-use bevy_game::GamePlugin; // ToDo: Replace bevy_game with your new crate name.
-use std::io::Cursor;
-use winit::window::Icon;
+use bevy::{
+    color::palettes::css::WHITE, input::common_conditions::input_toggle_active, prelude::*,
+};
+use bevy_flycam::*;
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use bevy_stl::StlPlugin;
+use events::{handle_spawn_robot, SpawnRobot};
+use plugin::UrdfPlugin;
+use urdf_asset_loader::UrdfAsset;
 
 fn main() {
     App::new()
-        .insert_resource(ClearColor(Color::linear_rgb(0.4, 0.4, 0.4)))
-        .add_plugins(
-            DefaultPlugins
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        title: "Bevy game".to_string(), // ToDo
-                        // Bind to canvas included in `index.html`
-                        canvas: Some("#bevy".to_owned()),
-                        fit_canvas_to_parent: true,
-                        // Tells wasm not to override default event handling, like F5 and Ctrl+R
-                        prevent_default_event_handling: false,
-                        ..default()
-                    }),
-                    ..default()
-                })
-                .set(AssetPlugin {
-                    meta_check: AssetMetaCheck::Never,
-                    ..default()
-                }),
-        )
-        .add_plugins(GamePlugin)
-        .add_systems(Startup, set_window_icon)
+        .add_plugins((
+            DefaultPlugins,
+            UrdfPlugin,
+            StlPlugin,
+            NoCameraPlayerPlugin,
+            WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
+        ))
+        .init_state::<AppState>()
+        .insert_resource(MovementSettings {
+            speed: 1.0,
+            ..default()
+        })
+        .add_systems(Startup, (load_robot, setup_scene))
+        .add_systems(Update, handle_spawn_robot)
+        .add_systems(Update, start_simulation.run_if(in_state(AppState::Loading)))
         .run();
 }
 
-// Sets the icon on windows and X11
-fn set_window_icon(
-    windows: NonSend<WinitWindows>,
-    primary_window: Query<Entity, With<PrimaryWindow>>,
+fn load_robot(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let robot_handle = RobotHandle(asset_server.load("robots/flamingo_edu/urdf/Edu_v4.urdf"));
+    commands.insert_resource(robot_handle);
+}
+
+fn start_simulation(
+    robot_handle: Res<RobotHandle>,
+    urdf_assets: Res<Assets<UrdfAsset>>,
+    mut er_spawn_robot: EventWriter<SpawnRobot>,
+    mut state: ResMut<NextState<AppState>>,
 ) {
-    let primary_entity = primary_window.single();
-    let Some(primary) = windows.get_window(primary_entity) else {
-        return;
-    };
-    let icon_buf = Cursor::new(include_bytes!(
-        "../build/macos/AppIcon.iconset/icon_256x256.png"
-    ));
-    if let Ok(image) = image::load(icon_buf, image::ImageFormat::Png) {
-        let image = image.into_rgba8();
-        let (width, height) = image.dimensions();
-        let rgba = image.into_raw();
-        let icon = Icon::from_rgba(rgba, width, height).unwrap();
-        primary.set_window_icon(Some(icon));
-    };
+    if urdf_assets.get(robot_handle.id()).is_some() {
+        er_spawn_robot.send(SpawnRobot {
+            handle: robot_handle.clone(),
+        });
+        state.set(AppState::Simulation);
+    }
+}
+
+#[derive(Resource, Deref, DerefMut)]
+struct RobotHandle(Handle<UrdfAsset>);
+
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
+enum AppState {
+    #[default]
+    Loading,
+    Simulation,
+}
+
+#[allow(deprecated)]
+fn setup_scene(mut commands: Commands) {
+    commands.insert_resource(AmbientLight {
+        color: WHITE.into(),
+        brightness: 300.0,
+    });
+
+    commands
+        .spawn(Camera3dBundle {
+            transform: Transform::from_xyz(0.0, 2.0, 2.0).looking_at(Vec3::ZERO, Vec3::Y),
+            ..default()
+        })
+        .insert(FlyCam);
 }
