@@ -7,10 +7,12 @@ use bevy::{
 };
 use bevy_flycam::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
-use events::{handle_spawn_robot, SpawnRobot};
-use plugin::UrdfPlugin;
-use urdf_asset_loader::UrdfAsset;
+
+use crate::events::{handle_spawn_robot, SpawnRobot};
+use crate::plugin::UrdfPlugin;
+use crate::urdf_asset_loader::UrdfAsset;
 
 fn main() {
     App::new()
@@ -19,6 +21,7 @@ fn main() {
             UrdfPlugin,
             StlPlugin,
             NoCameraPlayerPlugin,
+            RapierPhysicsPlugin::<NoUserData>::default(),
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
         ))
         .init_state::<AppState>()
@@ -74,4 +77,12 @@ fn setup_scene(mut commands: Commands) {
             ..default()
         })
         .insert(FlyCam);
+
+    let ground_size = 200.1;
+    let ground_height = 0.1;
+
+    commands.spawn((
+        Transform::from_xyz(0.0, -ground_height, 0.0),
+        Collider::cuboid(ground_size, ground_height, ground_size),
+    ));
 }

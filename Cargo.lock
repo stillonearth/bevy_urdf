@@ -1113,6 +1113,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89fe0b0b919146939481a3a7c38864face2c6d0fd2c73ab3d430dc693ecd9b11"
 
 [[package]]
+name = "bevy_rapier3d"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85f3856331b3f75e900db0fd47c34d7e63dc7f736f455e9d0e6d775a24099c37"
+dependencies = [
+ "bevy",
+ "bitflags 2.9.0",
+ "log",
+ "nalgebra",
+ "rapier3d",
+]
+
+[[package]]
 name = "bevy_reflect"
 version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1404,6 +1417,7 @@ dependencies = [
  "bevy",
  "bevy-inspector-egui",
  "bevy_flycam",
+ "bevy_rapier3d",
  "bevy_stl",
  "rapier3d",
  "rapier3d-urdf",
@@ -4386,6 +4400,7 @@ dependencies = [
  "serde",
  "simba",
  "thiserror 1.0.69",
+ "vec_map",
  "web-time",
 ]
 
