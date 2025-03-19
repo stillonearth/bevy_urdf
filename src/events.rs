@@ -2,8 +2,8 @@ use std::path::Path;
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use rapier3d::prelude::RigidBodySet;
-use rapier3d_urdf::UrdfMultibodyOptions;
+use rapier3d::prelude::{MultibodyJointHandle, RigidBodyHandle};
+use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobotHandles};
 
 use crate::{plugin::extract_robot_geometry, urdf_asset_loader::UrdfAsset};
 
@@ -14,6 +14,9 @@ pub struct SpawnRobot {
 
 #[derive(Component, Default)]
 pub struct UrdfRobot {}
+
+#[derive(Component, Default, Deref)]
+pub struct UrdfRobotRigidBodyHandle(pub RigidBodyHandle);
 
 pub(crate) fn handle_spawn_robot(
     mut commands: Commands,
@@ -31,18 +34,32 @@ pub(crate) fn handle_spawn_robot(
     for event in er_spawn_robot.read() {
         let robot_handle = event.handle.clone();
         if let Some(urdf) = urdf_assets.get(robot_handle.id()) {
-            let geoms = extract_robot_geometry(urdf);
-
+            let mut handles: Option<UrdfRobotHandles<Option<MultibodyJointHandle>>> = None;
             for (_entity, mut rigid_body_set, mut collider_set, mut multibidy_joint_set) in
                 q_rapier_context.iter_mut()
             {
-                urdf.urdf_robot.clone().insert_using_multibody_joints(
+                handles = Some(urdf.urdf_robot.clone().insert_using_multibody_joints(
                     &mut rigid_body_set.bodies,
                     &mut collider_set.colliders,
                     &mut multibidy_joint_set.multibody_joints,
                     UrdfMultibodyOptions::DISABLE_SELF_CONTACTS,
-                );
+                ));
+                break;
             }
+
+            if handles.is_none() {
+                panic!("couldn't initialize handles");
+            }
+
+            let body_handles: Vec<RigidBodyHandle> = handles
+                .unwrap()
+                .links
+                .iter()
+                .map(|link| link.body.clone())
+                .collect();
+            let geoms = extract_robot_geometry(urdf);
+
+            assert_eq!(body_handles.len(), geoms.len());
 
             commands
                 .spawn((
@@ -50,7 +67,7 @@ pub(crate) fn handle_spawn_robot(
                     Transform::IDENTITY.with_rotation(Quat::from_rotation_z(std::f32::consts::PI)),
                 ))
                 .with_children(|children| {
-                    for (index, geom, origin_pose, inertia_pose, collider) in geoms {
+                    for (index, geom, _origin_pose, _inertia_pose, _collider) in geoms {
                         match geom {
                             urdf_rs::Geometry::Box { size } => todo!(),
                             urdf_rs::Geometry::Cylinder { radius, length } => todo!(),
@@ -83,6 +100,7 @@ pub(crate) fn handle_spawn_robot(
                                 children.spawn((
                                     mesh_3d,
                                     MeshMaterial3d(materials.add(Color::srgb(0.3, 0.4, 0.3))),
+                                    UrdfRobotRigidBodyHandle(body_handles[index]),
                                     transform,
                                 ));
                             }
