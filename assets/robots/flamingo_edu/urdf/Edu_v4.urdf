@@ -17,7 +17,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/base_link.STL" />
+          filename="base_link.STL" />
       </geometry>
       <material
         name="">
@@ -31,7 +31,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/base_link.STL" />
+          filename="base_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -48,7 +48,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/left_shoulder_link.STL" />
+          filename="left_shoulder_link.STL" />
       </geometry>
       <material
         name="">
@@ -62,7 +62,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/left_shoulder_link.STL" />
+          filename="left_shoulder_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -97,7 +97,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/left_leg_link.STL" />
+          filename="left_leg_link.STL" />
       </geometry>
       <material
         name="">
@@ -111,7 +111,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/left_leg_link.STL" />
+          filename="left_leg_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -146,7 +146,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/left_wheel_link.STL" />
+          filename="left_wheel_link.STL" />
       </geometry>
       <material
         name="">
@@ -160,7 +160,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/left_wheel_link.STL" />
+          filename="left_wheel_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -193,7 +193,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/right_shoulder_link.STL" />
+          filename="right_shoulder_link.STL" />
       </geometry>
       <material
         name="">
@@ -207,7 +207,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/right_shoulder_link.STL" />
+          filename="right_shoulder_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -242,7 +242,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/right_leg_link.STL" />
+          filename="right_leg_link.STL" />
       </geometry>
       <material
         name="">
@@ -256,7 +256,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/right_leg_link.STL" />
+          filename="right_leg_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -291,7 +291,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/right_wheel_link.STL" />
+          filename="right_wheel_link.STL" />
       </geometry>
       <material
         name="">
@@ -305,7 +305,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/right_wheel_link.STL" />
+          filename="right_wheel_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -338,7 +338,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/left_upper_link.STL" />
+          filename="left_upper_link.STL" />
       </geometry>
       <material
         name="">
@@ -352,7 +352,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/left_upper_link.STL" />
+          filename="left_upper_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -387,7 +387,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/right_upper_link.STL" />
+          filename="right_upper_link.STL" />
       </geometry>
       <material
         name="">
@@ -401,7 +401,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/right_upper_link.STL" />
+          filename="right_upper_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -436,7 +436,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/front_cover_link.STL" />
+          filename="front_cover_link.STL" />
       </geometry>
       <material
         name="">
@@ -450,7 +450,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/front_cover_link.STL" />
+          filename="front_cover_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -480,7 +480,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/rear_cover_link.STL" />
+          filename="rear_cover_link.STL" />
       </geometry>
       <material
         name="">
@@ -494,7 +494,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/rear_cover_link.STL" />
+          filename="rear_cover_link.STL" />
       </geometry>
     </collision>
   </link>

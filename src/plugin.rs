@@ -1,5 +1,8 @@
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::{RapierContextSimulation, RapierRigidBodySet};
+use bevy_rapier3d::{
+    plugin::RapierConfiguration,
+    prelude::{RapierContextSimulation, RapierRigidBodySet},
+};
 use rapier3d::prelude::Collider;
 use urdf_rs::{Geometry, Pose};
 
@@ -57,20 +60,22 @@ fn sync_robot_geometry(
     for (rapier_rigid_body_set) in q_rapier_rigid_body_set.iter() {
         for (_, mut transform, body_handle) in q_rapier_robot_bodies.iter_mut() {
             if let Some(robot_body) = rapier_rigid_body_set.0.bodies.get(body_handle.0) {
-                let robot_position = robot_body.position();
+                let rapier_pos = robot_body.position();
 
-                let rapier_rot = robot_position.rotation;
-                let rapier_pos = robot_position.translation;
+                let rapier_rot = rapier_pos.rotation;
 
-                let bevy_quat =
-                    Quat::from_array([rapier_rot.i, rapier_rot.j, rapier_rot.k, rapier_rot.w]);
+                let quat_fix = Quat::from_rotation_z(std::f32::consts::PI);
+                let bevy_quat = quat_fix
+                    * Quat::from_array([rapier_rot.i, rapier_rot.j, rapier_rot.k, rapier_rot.w]);
 
-                *transform = Transform::from_translation(Vec3::new(
-                    rapier_pos.x,
-                    rapier_pos.y,
-                    rapier_pos.z,
-                ))
-                .with_rotation(bevy_quat);
+                let rapier_vec = Vec3::new(
+                    rapier_pos.translation.x,
+                    rapier_pos.translation.y,
+                    rapier_pos.translation.z,
+                );
+                let bevy_vec = quat_fix.mul_vec3(rapier_vec);
+
+                *transform = Transform::from_translation(bevy_vec).with_rotation(bevy_quat);
             }
         }
     }

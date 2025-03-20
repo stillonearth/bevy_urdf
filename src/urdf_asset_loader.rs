@@ -44,15 +44,19 @@ impl AssetLoader for RpyAssetLoader {
 
         let options = UrdfLoaderOptions {
             create_colliders_from_visual_shapes: true,
-            create_colliders_from_collision_shapes: true,
-            make_roots_fixed: true,
+            create_colliders_from_collision_shapes: false,
+            enable_joint_collisions: false,
+            apply_imported_mass_props: true,
+            make_roots_fixed: false,
             // Z-up to Y-up.
             shift: Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2),
             ..Default::default()
         };
 
-        let mesh_dir = Path::new("./");
+        let mesh_dir = Path::new("assets/robots/flamingo_edu/urdf");
         let (urdf_robot, robot) = UrdfRobot::from_str(content, options, mesh_dir).unwrap();
+
+        // urdf_to_colliders
 
         Ok(UrdfAsset { robot, urdf_robot })
     }
