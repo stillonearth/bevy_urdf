@@ -51,11 +51,11 @@ impl AssetLoader for RpyAssetLoader {
         let options = UrdfLoaderOptions {
             create_colliders_from_visual_shapes: true,
             create_colliders_from_collision_shapes: false,
-            enable_joint_collisions: false,
+            enable_joint_collisions: true,
             apply_imported_mass_props: true,
             make_roots_fixed: false,
             // Z-up to Y-up.
-            shift: Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2),
+            shift: Isometry::rotation(-Vector::x() * std::f32::consts::FRAC_PI_2),
             ..Default::default()
         };
 

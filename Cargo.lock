@@ -4420,6 +4420,8 @@ dependencies = [
 [[package]]
 name = "rapier3d-urdf"
 version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6d979d0db3ade9fb2f9a1737bb91a9b9d26b10ab82046625b9dfc4a4f4c5030"
 dependencies = [
  "anyhow",
  "bitflags 2.9.0",

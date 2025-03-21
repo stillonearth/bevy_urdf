@@ -4,7 +4,10 @@ use rapier3d::prelude::Collider;
 use urdf_rs::{Geometry, Pose};
 
 use crate::{
-    events::{LoadRobot, RobotLoaded, SpawnRobot, UrdfRobotRigidBodyHandle, WaitRobotLoaded},
+    events::{
+        handle_load_robot, handle_spawn_robot, handle_wait_robot_loaded, LoadRobot, RobotLoaded,
+        SpawnRobot, UrdfRobotRigidBodyHandle, WaitRobotLoaded,
+    },
     urdf_asset_loader::{self, UrdfAsset},
 };
 pub struct UrdfPlugin;
@@ -17,6 +20,14 @@ impl Plugin for UrdfPlugin {
             .add_event::<LoadRobot>()
             .add_event::<RobotLoaded>()
             .add_systems(Update, sync_robot_geometry)
+            .add_systems(
+                Update,
+                (
+                    handle_spawn_robot,
+                    handle_load_robot,
+                    handle_wait_robot_loaded,
+                ),
+            )
             .init_asset::<urdf_asset_loader::UrdfAsset>();
     }
 }
@@ -33,7 +44,7 @@ pub fn extract_robot_geometry(
             None
         };
 
-        let geometry = if link.visual.len() > 0 {
+        let geometry = if !link.visual.is_empty() {
             Some(link.visual[0].geometry.clone())
         } else {
             None
@@ -50,7 +61,7 @@ fn sync_robot_geometry(
     mut q_rapier_robot_bodies: Query<(Entity, &mut Transform, &mut UrdfRobotRigidBodyHandle)>,
     q_rapier_rigid_body_set: Query<(&RapierRigidBodySet,)>,
 ) {
-    for (rapier_rigid_body_set) in q_rapier_rigid_body_set.iter() {
+    for rapier_rigid_body_set in q_rapier_rigid_body_set.iter() {
         for (_, mut transform, body_handle) in q_rapier_robot_bodies.iter_mut() {
             if let Some(robot_body) = rapier_rigid_body_set.0.bodies.get(body_handle.0) {
                 let rapier_pos = robot_body.position();
@@ -67,6 +78,7 @@ fn sync_robot_geometry(
                     rapier_pos.translation.z,
                 );
                 let bevy_vec = quat_fix.mul_vec3(rapier_vec);
+                // bevy_vec.y *= -1.0;
 
                 *transform = Transform::from_translation(bevy_vec).with_rotation(bevy_quat);
             }

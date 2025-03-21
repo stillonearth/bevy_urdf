@@ -2,10 +2,7 @@ use std::path::Path;
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use rapier3d::prelude::{
-    ColliderBuilder, Group, ImpulseJointHandle, InteractionGroups, MultibodyJointHandle,
-    RigidBodyHandle,
-};
+use rapier3d::prelude::{MultibodyJointHandle, RigidBodyHandle};
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobotHandles};
 
 use crate::{
@@ -69,16 +66,7 @@ pub(crate) fn handle_spawn_robot(
             for (_entity, mut rigid_body_set, mut collider_set, mut multibidy_joint_set) in
                 q_rapier_context.iter_mut()
             {
-                let collider = ColliderBuilder::cuboid(100.0, 0.1, 100.0).build();
-                collider_set.colliders.insert(collider);
-
-                let mut urdf_robot = urdf.urdf_robot.clone();
-
-                for (i, _) in urdf_robot.links.clone().iter().enumerate() {
-                    urdf_robot.links[i].body.set_gravity_scale(-1.0, true);
-                    // urdf_robot.links[i].body.set_additional_mass(1.0, true);
-                    // println!("mass: {}", urdf_robot.links[i].body.mass());
-                }
+                let urdf_robot = urdf.urdf_robot.clone();
 
                 handles = Some(urdf_robot.clone().insert_using_multibody_joints(
                     &mut rigid_body_set.bodies,
@@ -97,7 +85,7 @@ pub(crate) fn handle_spawn_robot(
                 .unwrap()
                 .links
                 .iter()
-                .map(|link| link.body.clone())
+                .map(|link| link.body)
                 .collect();
             let geoms = extract_robot_geometry(urdf);
 
@@ -106,10 +94,9 @@ pub(crate) fn handle_spawn_robot(
             commands
                 .spawn((
                     UrdfRobot {},
-                    Transform::IDENTITY,
-                    Name::new("robot"),
+                    Transform::IDENTITY.with_rotation(Quat::from_rotation_x(std::f32::consts::PI)),
+                    Name::new("URDF Robot"),
                     InheritedVisibility::VISIBLE,
-                    // Transform::IDENTITY.with_rotation(Quat::from_rotation_z(std::f32::consts::PI)),
                 ))
                 .with_children(|children| {
                     for (index, geom, _inertia_pose, _collider) in geoms {
@@ -132,9 +119,7 @@ pub(crate) fn handle_spawn_robot(
                                 let model_path = Path::new(base_path).join(filename);
                                 let model_path = model_path.to_str().unwrap();
 
-                                let mesh_3d = Mesh3d(asset_server.load(model_path));
-
-                                mesh_3d
+                                Mesh3d(asset_server.load(model_path))
                             }
                         };
 
@@ -165,7 +150,7 @@ pub(crate) fn handle_spawn_robot(
                             mesh_3d,
                             MeshMaterial3d(materials.add(Color::srgb(0.3, 0.4, 0.3))),
                             UrdfRobotRigidBodyHandle(body_handles[index]),
-                            RapierContextEntityLink(rapier_context_simulation_entity.clone()),
+                            RapierContextEntityLink(rapier_context_simulation_entity),
                             transform,
                         ));
                     }

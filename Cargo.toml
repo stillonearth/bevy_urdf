@@ -3,11 +3,14 @@ name = "bevy_urdf"
 version = "0.0.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
+description = "Import robots from URDF files and run simulation with rapier."
+keywords = ["rapier", "bevy", "urdf", "robotics"]
+repository = "https://github.com/stillonearth/bevy_urdf"
 
 [dependencies]
 anyhow = "1.0"
 bevy = { version = "0.15" }
-rapier3d-urdf = {path="../rapier3d-urdf", features=["stl", "collada"] }
+rapier3d-urdf = {version="0.4", features=["stl"] }
 rapier3d = "0.23"
 bevy_rapier3d = { version = "0.29", features = [ "simd-stable", "debug-render-3d" ] }
 bevy_stl = "0.15"
