@@ -16,3 +16,4 @@ urdf-rs = "0.9"
 thiserror = "2.0"
 bevy_flycam = "0.15.0"
 bevy-inspector-egui = "0.30.0"
+serde = { version = "1", features = ["derive"] }

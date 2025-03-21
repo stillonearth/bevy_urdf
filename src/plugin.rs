@@ -1,13 +1,10 @@
 use bevy::prelude::*;
-use bevy_rapier3d::{
-    plugin::RapierConfiguration,
-    prelude::{RapierContextSimulation, RapierRigidBodySet},
-};
+use bevy_rapier3d::prelude::RapierRigidBodySet;
 use rapier3d::prelude::Collider;
 use urdf_rs::{Geometry, Pose};
 
 use crate::{
-    events::{SpawnRobot, UrdfRobotRigidBodyHandle},
+    events::{LoadRobot, RobotLoaded, SpawnRobot, UrdfRobotRigidBodyHandle, WaitRobotLoaded},
     urdf_asset_loader::{self, UrdfAsset},
 };
 pub struct UrdfPlugin;
@@ -16,6 +13,9 @@ impl Plugin for UrdfPlugin {
     fn build(&self, app: &mut App) {
         app.init_asset_loader::<urdf_asset_loader::RpyAssetLoader>()
             .add_event::<SpawnRobot>()
+            .add_event::<WaitRobotLoaded>()
+            .add_event::<LoadRobot>()
+            .add_event::<RobotLoaded>()
             .add_systems(Update, sync_robot_geometry)
             .init_asset::<urdf_asset_loader::UrdfAsset>();
     }

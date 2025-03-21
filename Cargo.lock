@@ -1422,6 +1422,7 @@ dependencies = [
  "rapier3d",
  "rapier3d-urdf",
  "rapier_testbed3d",
+ "serde",
  "thiserror 2.0.12",
  "urdf-rs",
 ]

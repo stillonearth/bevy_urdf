@@ -9,10 +9,11 @@ use bevy_flycam::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
+use events::{handle_load_robot, handle_wait_robot_loaded, LoadRobot, RobotLoaded};
+use rapier3d::prelude::ColliderBuilder;
 
 use crate::events::{handle_spawn_robot, SpawnRobot};
 use crate::plugin::UrdfPlugin;
-use crate::urdf_asset_loader::UrdfAsset;
 
 fn main() {
     App::new()
@@ -22,6 +23,7 @@ fn main() {
             StlPlugin,
             NoCameraPlayerPlugin,
             RapierPhysicsPlugin::<NoUserData>::default(),
+            // RapierDebugRenderPlugin::default(),
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
         ))
         .init_state::<AppState>()
@@ -29,33 +31,32 @@ fn main() {
             speed: 1.0,
             ..default()
         })
-        .add_systems(Startup, (load_robot, setup_scene))
-        .add_systems(Update, handle_spawn_robot)
+        .add_systems(Startup, (setup))
+        .add_systems(
+            Update,
+            (
+                handle_spawn_robot,
+                handle_load_robot,
+                handle_wait_robot_loaded,
+            ),
+        )
         .add_systems(Update, start_simulation.run_if(in_state(AppState::Loading)))
         .run();
 }
 
-fn load_robot(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let robot_handle = RobotHandle(asset_server.load("robots/unitree_a1/urdf/a1.urdf"));
-    commands.insert_resource(robot_handle);
-}
-
 fn start_simulation(
-    robot_handle: Res<RobotHandle>,
-    urdf_assets: Res<Assets<UrdfAsset>>,
-    mut er_spawn_robot: EventWriter<SpawnRobot>,
+    mut er_robot_loaded: EventReader<RobotLoaded>,
+    mut ew_spawn_robot: EventWriter<SpawnRobot>,
     mut state: ResMut<NextState<AppState>>,
 ) {
-    if urdf_assets.get(robot_handle.id()).is_some() {
-        er_spawn_robot.send(SpawnRobot {
-            handle: robot_handle.clone(),
+    for event in er_robot_loaded.read() {
+        ew_spawn_robot.send(SpawnRobot {
+            handle: event.handle.clone(),
+            mesh_dir: event.mesh_dir.clone(),
         });
         state.set(AppState::Simulation);
     }
 }
-
-#[derive(Resource, Deref, DerefMut)]
-struct RobotHandle(Handle<UrdfAsset>);
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 enum AppState {
@@ -65,11 +66,19 @@ enum AppState {
 }
 
 #[allow(deprecated)]
-fn setup_scene(
+fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut ew_load_robot: EventWriter<LoadRobot>,
+    mut q_rapier_context: Query<(
+        Entity,
+        &mut RapierRigidBodySet,
+        &mut RapierContextColliders,
+        &mut RapierContextJoints,
+    )>,
 ) {
+    // Scene
     commands.insert_resource(AmbientLight {
         color: WHITE.into(),
         brightness: 300.0,
@@ -83,12 +92,38 @@ fn setup_scene(
         FlyCam,
     ));
 
+    // ground
+    // commands.spawn((
+    //     Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+    //     MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+    //     Collider::cuboid(0.5, 0.5, 0.5),
+    //     Transform::from_xyz(0.0, -2.5, 0.0),
+    //     RigidBody::Fixed,
+    // ));
+
     commands.spawn((
         Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
-        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+        MeshMaterial3d(materials.add(Color::srgba(0.2, 0.7, 0.1, 0.1))),
         Collider::cuboid(0.5, 0.5, 0.5),
-        // CollisionGroups::new(Group::GROUP_1 | Group::GROUP_2, Group::NONE),
-        Transform::from_xyz(0.0, -2.5, 0.0),
-        RigidBody::Fixed,
+        Transform::from_xyz(0.0, 2.5, 0.0),
+        RigidBody::Dynamic,
     ));
+
+    for (_entity, mut rigid_body_set, mut collider_set, mut multibidy_joint_set) in
+        q_rapier_context.iter_mut()
+    {
+        let collider = ColliderBuilder::cuboid(100.0, 0.1, 100.0).build();
+        // collider_set.colliders.insert(collider);
+    }
+
+    // load robot
+    // ew_load_robot.send(LoadRobot {
+    //     urdf_path: "robots/unitree_a1/urdf/a1.urdf".to_string(),
+    //     mesh_dir: "assets/robots/unitree_a1/urdf".to_string(),
+    // });
+
+    ew_load_robot.send(LoadRobot {
+        urdf_path: "robots/flamingo_edu/urdf/Edu_v4.urdf".to_string(),
+        mesh_dir: "assets/robots/flamingo_edu/urdf".to_string(),
+    });
 }

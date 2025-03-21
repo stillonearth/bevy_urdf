@@ -8,11 +8,33 @@ use rapier3d::prelude::{
 };
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobotHandles};
 
-use crate::{plugin::extract_robot_geometry, urdf_asset_loader::UrdfAsset};
+use crate::{
+    plugin::extract_robot_geometry,
+    urdf_asset_loader::{RpyAssetLoaderSettings, UrdfAsset},
+};
 
 #[derive(Clone, Event)]
 pub struct SpawnRobot {
     pub handle: Handle<UrdfAsset>,
+    pub mesh_dir: String,
+}
+
+#[derive(Clone, Event)]
+pub struct WaitRobotLoaded {
+    pub handle: Handle<UrdfAsset>,
+    pub mesh_dir: String,
+}
+
+#[derive(Clone, Event)]
+pub struct RobotLoaded {
+    pub handle: Handle<UrdfAsset>,
+    pub mesh_dir: String,
+}
+
+#[derive(Clone, Event)]
+pub struct LoadRobot {
+    pub urdf_path: String,
+    pub mesh_dir: String,
 }
 
 #[derive(Component, Default)]
@@ -23,18 +45,20 @@ pub struct UrdfRobotRigidBodyHandle(pub RigidBodyHandle);
 
 pub(crate) fn handle_spawn_robot(
     mut commands: Commands,
-    mut er_spawn_robot: EventReader<SpawnRobot>,
-    urdf_assets: Res<Assets<UrdfAsset>>,
     asset_server: Res<AssetServer>,
+    mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    urdf_assets: Res<Assets<UrdfAsset>>,
     mut q_rapier_context: Query<(
         Entity,
         &mut RapierRigidBodySet,
         &mut RapierContextColliders,
         &mut RapierContextJoints,
     )>,
-    mut meshes: ResMut<Assets<Mesh>>,
+
     q_rapier_context_simulation: Query<(Entity, &RapierContextSimulation)>,
+    mut er_spawn_robot: EventReader<SpawnRobot>,
+    mut ew_wait_robot_loaded: EventWriter<WaitRobotLoaded>,
 ) {
     for event in er_spawn_robot.read() {
         let rapier_context_simulation_entity = q_rapier_context_simulation.iter().next().unwrap().0;
@@ -45,47 +69,16 @@ pub(crate) fn handle_spawn_robot(
             for (_entity, mut rigid_body_set, mut collider_set, mut multibidy_joint_set) in
                 q_rapier_context.iter_mut()
             {
-                // insert colliders
-
-                for (_, collider) in collider_set.colliders.iter() {
-                    println!("collider {:?}", collider.collision_groups());
-                    println!("collider {:?}", collider.active_collision_types());
-                    println!("collider {:?}", collider.position());
-                }
-
-                let mut collider = ColliderBuilder::cuboid(100.0, 0.1, 100.0).build();
-                // // println!("collider, {:?}", collider.);
-                // // collider.set_position(Isometry::<Real>::ne);
+                let collider = ColliderBuilder::cuboid(100.0, 0.1, 100.0).build();
                 collider_set.colliders.insert(collider);
 
                 let mut urdf_robot = urdf.urdf_robot.clone();
 
-                // for link in urdf_robot.links.iter() {
-                //     for mut collider in link.colliders.iter_mut() {
-                //         println!("collider id: {:?}", collider.collision_groups());
-                //         collider.set_collision_groups(InteractionGroups::all());
-                //     }
-                // }
-
                 for (i, _) in urdf_robot.links.clone().iter().enumerate() {
                     urdf_robot.links[i].body.set_gravity_scale(-1.0, true);
-                    let mut colliders = urdf_robot.links[i].colliders.clone();
-                    // }
-                    for (_, collider) in colliders.clone().iter().enumerate() {
-                        println!("");
-                        println!("robot collider {:?}", collider.collision_groups());
-                        println!("robot collider {:?}", collider.active_collision_types());
-                        println!("robot collider {:?}", collider.position());
-                    }
-                    // urdf_robot.links[i].colliders = colliders;
+                    // urdf_robot.links[i].body.set_additional_mass(1.0, true);
+                    // println!("mass: {}", urdf_robot.links[i].body.mass());
                 }
-
-                // handles = Some(urdf_robot.clone().insert_using_impulse_joints(
-                //     &mut rigid_body_set.bodies,
-                //     &mut collider_set.colliders,
-                //     &mut multibidy_joint_set.impulse_joints,
-                //     // UrdfMultibodyOptions::DISABLE_SELF_CONTACTS,
-                // ));
 
                 handles = Some(urdf_robot.clone().insert_using_multibody_joints(
                     &mut rigid_body_set.bodies,
@@ -135,8 +128,7 @@ pub(crate) fn handle_spawn_robot(
                                 Mesh3d(meshes.add(Sphere::new(radius as f32)))
                             }
                             urdf_rs::Geometry::Mesh { filename, scale } => {
-                                println!("filename: {}", filename);
-                                let base_path = "robots/unitree_a1/urdf";
+                                let base_path = event.mesh_dir.as_str();
                                 let model_path = Path::new(base_path).join(filename);
                                 let model_path = model_path.to_str().unwrap();
 
@@ -178,6 +170,43 @@ pub(crate) fn handle_spawn_robot(
                         ));
                     }
                 });
+        } else {
+            ew_wait_robot_loaded.send(WaitRobotLoaded {
+                handle: event.handle.clone(),
+                mesh_dir: event.mesh_dir.clone(),
+            });
         }
+    }
+}
+
+pub(crate) fn handle_load_robot(
+    asset_server: Res<AssetServer>,
+    mut er_load_robot: EventReader<LoadRobot>,
+    mut ew_robot_loaded: EventWriter<RobotLoaded>,
+) {
+    for event in er_load_robot.read() {
+        let mesh_dir = Some(event.clone().mesh_dir);
+        let robot_handle: Handle<UrdfAsset> =
+            asset_server.load_with_settings(event.clone().urdf_path, move |s: &mut _| {
+                *s = RpyAssetLoaderSettings {
+                    mesh_dir: mesh_dir.clone(),
+                }
+            });
+
+        ew_robot_loaded.send(RobotLoaded {
+            handle: robot_handle,
+            mesh_dir: event.mesh_dir.clone().replace("assets/", ""),
+        });
+    }
+}
+pub(crate) fn handle_wait_robot_loaded(
+    mut er_wait_robot_loaded: EventReader<WaitRobotLoaded>,
+    mut ew_spawn_robot: EventWriter<SpawnRobot>,
+) {
+    for event in er_wait_robot_loaded.read() {
+        ew_spawn_robot.send(SpawnRobot {
+            handle: event.handle.clone(),
+            mesh_dir: event.mesh_dir.clone(),
+        });
     }
 }

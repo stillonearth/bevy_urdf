@@ -6,6 +6,7 @@ use bevy::{
 };
 use rapier3d::prelude::*;
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfRobot};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use urdf_rs::Robot;
 
@@ -18,6 +19,11 @@ pub struct UrdfAsset {
     pub urdf_robot: UrdfRobot,
 }
 
+#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+pub struct RpyAssetLoaderSettings {
+    pub mesh_dir: Option<String>,
+}
+
 #[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum UrdfAssetLoaderError {
@@ -27,13 +33,13 @@ pub enum UrdfAssetLoaderError {
 
 impl AssetLoader for RpyAssetLoader {
     type Asset = UrdfAsset;
-    type Settings = ();
+    type Settings = RpyAssetLoaderSettings;
     type Error = UrdfAssetLoaderError;
 
     async fn load(
         &self,
         reader: &mut dyn Reader,
-        _settings: &(),
+        settings: &RpyAssetLoaderSettings,
         _load_context: &mut LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {
         // read urdf file to memory
@@ -47,13 +53,15 @@ impl AssetLoader for RpyAssetLoader {
             create_colliders_from_collision_shapes: false,
             enable_joint_collisions: false,
             apply_imported_mass_props: true,
-            make_roots_fixed: true,
+            make_roots_fixed: false,
             // Z-up to Y-up.
             shift: Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2),
             ..Default::default()
         };
 
-        let mesh_dir = Path::new("assets/robots/unitree_a1/urdf");
+        let mesh_dir = settings.clone().mesh_dir.unwrap_or("./".to_string());
+        let mesh_dir = Path::new(&mesh_dir);
+
         let (urdf_robot, robot) = UrdfRobot::from_str(content, options, mesh_dir).unwrap();
 
         // urdf_to_colliders
