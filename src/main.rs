@@ -36,7 +36,7 @@ fn main() {
 }
 
 fn load_robot(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let robot_handle = RobotHandle(asset_server.load("robots/flamingo_edu/urdf/Edu_v4.urdf"));
+    let robot_handle = RobotHandle(asset_server.load("robots/unitree_a1/urdf/a1.urdf"));
     commands.insert_resource(robot_handle);
 }
 
@@ -77,7 +77,7 @@ fn setup_scene(
 
     commands.spawn((
         Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 2.0, 2.0).looking_at(Vec3::ZERO, Vec3::Y),
+            transform: Transform::from_xyz(1.0, 1.0, 1.0).looking_at(Vec3::ZERO, Vec3::Y),
             ..default()
         },
         FlyCam,
@@ -87,7 +87,7 @@ fn setup_scene(
         Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
         MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
         Collider::cuboid(0.5, 0.5, 0.5),
-        CollisionGroups::new(Group::GROUP_1 | Group::GROUP_2, Group::NONE),
+        // CollisionGroups::new(Group::GROUP_1 | Group::GROUP_2, Group::NONE),
         Transform::from_xyz(0.0, -2.5, 0.0),
         RigidBody::Fixed,
     ));

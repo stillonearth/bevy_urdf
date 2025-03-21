@@ -23,31 +23,24 @@ impl Plugin for UrdfPlugin {
 
 pub fn extract_robot_geometry(
     robot: &UrdfAsset,
-) -> Vec<(usize, Geometry, Pose, Pose, Option<Collider>)> {
-    let mut result: Vec<(usize, Geometry, Pose, Pose, Option<Collider>)> = Vec::new();
+) -> Vec<(usize, Option<Geometry>, Pose, Option<Collider>)> {
+    let mut result: Vec<(usize, Option<Geometry>, Pose, Option<Collider>)> = Vec::new();
     for (i, link) in robot.robot.links.iter().enumerate() {
-        let visual_len = link.visual.len();
-        assert_eq!(visual_len, 1);
-
         let colliders = robot.urdf_robot.links[i].colliders.clone();
-        assert!(colliders.len() <= 1);
         let collider = if colliders.len() == 1 {
             Some(colliders[0].clone())
         } else {
             None
         };
 
-        let geometry = &link.visual[0].geometry;
-        let geometry_origin = &link.visual[0].origin;
+        let geometry = if link.visual.len() > 0 {
+            Some(link.visual[0].geometry.clone())
+        } else {
+            None
+        };
         let inertia_origin = link.inertial.origin.clone();
 
-        result.push((
-            i,
-            geometry.clone(),
-            geometry_origin.clone(),
-            inertia_origin.clone(),
-            collider,
-        ));
+        result.push((i, geometry.clone(), inertia_origin.clone(), collider));
     }
 
     result
