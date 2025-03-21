@@ -1,4 +1,4 @@
-# bevy_urdf_rapier
+# bevy_urdf
 
 Import robots from URDF files and run simulation with rapier.
 
