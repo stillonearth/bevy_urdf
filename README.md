@@ -1,5 +1,8 @@
 # bevy_urdf
 
+![image](https://github.com/user-attachments/assets/1ec9c5e8-0de1-4f25-a69a-4cfba12cd8ae)
+
+
 Import robots from URDF files and run simulation with rapier.
 
 ## API 
