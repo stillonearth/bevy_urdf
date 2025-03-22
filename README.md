@@ -44,10 +44,29 @@ fn start_simulation(
 }
 ```
 
+### Events
+
+Read sensors and control motors through events:
+
+
+```rust
+
+#[derive(Event)]
+pub struct SensorsRead {
+    pub handle: Handle<UrdfAsset>,
+    pub transforms: Vec<Transform>,
+    pub joint_angles: Vec<f32>,
+}
+
+#[derive(Event)]
+pub struct ControlMotors {
+    pub handle: Handle<UrdfAsset>,
+    pub velocities: Vec<f32>,
+}
+```
+
+
 ## Limitations
 
 You may need to hand-inspect urdf files to ensure mesh links are relative to urdf file. `package://` and links and gazebo nodes are not supported.
 
-## Work in Progress
-
-Support for controlling actuators and reading sensors in coming soon. 

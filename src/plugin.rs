@@ -6,9 +6,9 @@ use urdf_rs::{Geometry, Pose};
 
 use crate::{
     events::{
-        handle_load_robot, handle_spawn_robot, handle_wait_robot_loaded, LoadRobot, RobotLoaded,
-        RobotSpawned, SensorsRead, SpawnRobot, URDFRobot, UrdfRobotRigidBodyHandle,
-        WaitRobotLoaded,
+        handle_control_motors, handle_load_robot, handle_spawn_robot, handle_wait_robot_loaded,
+        ControlMotors, LoadRobot, RobotLoaded, RobotSpawned, SensorsRead, SpawnRobot, URDFRobot,
+        UrdfRobotRigidBodyHandle, WaitRobotLoaded,
     },
     urdf_asset_loader::{self, UrdfAsset},
 };
@@ -23,6 +23,7 @@ impl Plugin for UrdfPlugin {
             .add_event::<LoadRobot>()
             .add_event::<RobotLoaded>()
             .add_event::<SensorsRead>()
+            .add_event::<ControlMotors>()
             .add_systems(Update, sync_robot_geometry)
             .add_systems(
                 Update,
@@ -31,7 +32,7 @@ impl Plugin for UrdfPlugin {
                     handle_load_robot,
                     handle_wait_robot_loaded,
                     read_sensors,
-                    control_motors,
+                    handle_control_motors,
                 ),
             )
             .init_asset::<urdf_asset_loader::UrdfAsset>();
@@ -112,7 +113,6 @@ fn read_sensors(
 
         for (rapier_context_joints, rapier_rigid_bodies) in q_rapier_joints.iter() {
             for joint_link_handle in urdf_robot.rapier_handles.joints.iter() {
-                // println!("joint handle: {:?}", .)
                 if let Some(handle) = joint_link_handle.joint {
                     if let Some((multibody, index)) =
                         rapier_context_joints.multibody_joints.get(handle)
@@ -126,6 +126,10 @@ fn read_sensors(
                             if let Some(revolute) = joint.as_revolute() {
                                 let rb1 = rapier_rigid_bodies.bodies.get(body_1_link).unwrap();
                                 let rb2 = rapier_rigid_bodies.bodies.get(body_2_link).unwrap();
+
+                                if let Some(motor) = revolute.motor() {
+                                    println!("motor: {:?}", motor);
+                                }
 
                                 let angle = revolute.angle(rb1.rotation(), rb2.rotation());
 
@@ -148,69 +152,4 @@ fn read_sensors(
             joint_angles: joint_angles.entry(key.clone()).or_default().clone(),
         });
     }
-}
-
-fn control_motors(
-    q_urdf_robots: Query<(Entity, &URDFRobot)>,
-    q_urdf_rigid_bodies: Query<(Entity, &Parent, &Transform, &UrdfRobotRigidBodyHandle)>,
-    mut ew_sensors_read: EventWriter<SensorsRead>,
-    mut q_rapier_joints: Query<(&mut RapierContextJoints, &RapierRigidBodySet)>,
-) {
-
-    // TODO: IMPLEMENT
-
-    // let mut readings_hashmap: HashMap<Handle<UrdfAsset>, Vec<Transform>> = HashMap::new();
-    // let mut joint_angles: HashMap<Handle<UrdfAsset>, Vec<f32>> = HashMap::new();
-
-    // println!("___");
-    // for (parent_entity, urdf_robot) in &mut q_urdf_robots.iter() {
-    //     for joint_link_handle in urdf_robot.rapier_handles.joints.iter() {
-    //         for (mut rapier_context_joints, rapier_rigid_bodies) in q_rapier_joints.iter_mut() {
-    //             if let Some(handle) = joint_link_handle.joint {
-    //                 if let Some((multibody, index)) =
-    //                     rapier_context_joints.multibody_joints.get_mut(handle)
-    //                 {
-    //                     if let Some(link) = multibody.link_mut(index) {
-    //                         let mut joint = link.joint.data;
-
-    //                         if let Some(revolute) = joint.as_revolute_mut() {
-    //                             let mut rng = rand::rng();
-
-    //                             let target_vel = rng.random_range(-1.0..1.0);
-    //                             let max_force = rng.random_range(0.0..100.0);
-
-    //                             println!("motor: {:?}", revolute.motor());
-
-    //                             println!(
-    //                                 "motor: {:?}",
-    //                                 revolute.data.motors[JointAxis::AngX as usize]
-    //                             );
-    //                             // revolute.set_motor_velocity(MotorModel::AccelerationBased);
-    //                             revolute.data.set_motor_velocity(
-    //                                 JointAxis::AngX,
-    //                                 target_vel,
-    //                                 max_force,
-    //                             );
-
-    //                             println!("setting motor valocity");
-
-    //                             // joint_angles
-    //                             //     .entry(urdf_robot.handle.clone())
-    //                             //     .or_insert_with(Vec::new)
-    //                             //     .push(angle);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // for (key, transforms) in readings_hashmap.iter() {
-    //     ew_sensors_read.send(SensorsRead {
-    //         transforms: transforms.clone(),
-    //         handle: key.clone(),
-    //         joint_angles: joint_angles.entry(key.clone()).or_default().clone(),
-    //     });
-    // }
 }

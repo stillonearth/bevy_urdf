@@ -6,12 +6,12 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
 
-use bevy_urdf::events::{LoadRobot, RobotLoaded};
-use bevy_urdf::events::{RobotSpawned, URDFRobot, UrdfRobotRigidBodyHandle};
+use bevy_urdf::events::{ControlMotors, LoadRobot, RobotLoaded};
 use bevy_urdf::events::{SensorsRead, SpawnRobot};
 use bevy_urdf::plugin::UrdfPlugin;
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
-use rapier3d::prelude::JointEnabled;
+
+use rand::Rng;
 
 fn main() {
     App::new()
@@ -31,7 +31,7 @@ fn main() {
         })
         .insert_resource(UrdfRobotHandle(None))
         .add_systems(Startup, setup)
-        .add_systems(Update, (control_joint_motors, print_sensor_values))
+        .add_systems(Update, (control_motors, print_sensor_values))
         .add_systems(Update, start_simulation.run_if(in_state(AppState::Loading)))
         .run();
 }
@@ -56,7 +56,6 @@ fn start_simulation(
 }
 
 fn print_sensor_values(mut er_read_sensors: EventReader<SensorsRead>) {
-    return;
     for event in er_read_sensors.read() {
         println!("Robot: {:?}", event.handle.id());
         println!("\transforms:");
@@ -76,33 +75,19 @@ fn print_sensor_values(mut er_read_sensors: EventReader<SensorsRead>) {
     }
 }
 
-fn control_joint_motors(
-    mut q_rapier_joints: Query<(&mut RapierContextJoints,)>,
-    urdf_assets: Res<Assets<UrdfAsset>>,
+fn control_motors(
     robot_handle: Res<UrdfRobotHandle>,
+    mut ew_control_motors: EventWriter<ControlMotors>,
 ) {
     if let Some(handle) = robot_handle.0.clone() {
-        if let Some(urdf_asset) = urdf_assets.get(handle.id()) {
-            for mut rapier_context_joints in q_rapier_joints.iter_mut() {
-                let urdf_robot = urdf_asset.urdf_robot.clone();
-                for joint in urdf_robot.joints {
-                    if let Some(revolute) = joint.joint.as_revolute() {
-                        if let Some(motor) = revolute.motor() {
-                            println!("motor value {:?}", motor);
-                        }
-                        // println!("joint: {:?}",)
-                    }
+        let mut rng = rand::rng();
+        let mut velocities: Vec<f32> = Vec::new();
 
-                    // println!("joint value {:?}", joint.as
-                    // if joint.joint.enabled == JointEnabled::Enabled {
-                    //     for (handle, link, _, _) in rapier_context_joints.0.multibody_joints.iter()
-                    //     {
-                    //         link.
-                    //     }
-                    // }
-                }
-            }
+        for _ in 0..5 {
+            velocities.push(rng.random_range(-5.0..5.0));
         }
+
+        ew_control_motors.send(ControlMotors { handle, velocities });
     }
 }
 

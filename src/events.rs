@@ -52,6 +52,12 @@ pub struct SensorsRead {
     pub joint_angles: Vec<f32>,
 }
 
+#[derive(Event)]
+pub struct ControlMotors {
+    pub handle: Handle<UrdfAsset>,
+    pub velocities: Vec<f32>,
+}
+
 #[derive(Component, Default, Deref)]
 pub struct UrdfRobotRigidBodyHandle(pub RigidBodyHandle);
 
@@ -214,5 +220,53 @@ pub(crate) fn handle_wait_robot_loaded(
             handle: event.handle.clone(),
             mesh_dir: event.mesh_dir.clone(),
         });
+    }
+}
+
+pub(crate) fn handle_control_motors(
+    mut er_control_motors: EventReader<ControlMotors>,
+    q_urdf_robots: Query<(Entity, &URDFRobot)>,
+    mut q_rapier_joints: Query<(&mut RapierContextJoints, &RapierRigidBodySet)>,
+) {
+    for event in er_control_motors.read() {
+        for (_parent_entity, urdf_robot) in &mut q_urdf_robots.iter() {
+            if urdf_robot.handle != event.handle {
+                continue;
+            }
+
+            let mut actuator_index: usize = 0;
+
+            for joint_link_handle in urdf_robot.rapier_handles.joints.iter() {
+                for (mut rapier_context_joints, _rapier_rigid_bodies) in q_rapier_joints.iter_mut()
+                {
+                    if let Some(handle) = joint_link_handle.joint {
+                        if let Some((multibody, index)) =
+                            rapier_context_joints.multibody_joints.get_mut(handle)
+                        {
+                            if let Some(link) = multibody.link_mut(index) {
+                                let mut joint = link.joint.data;
+
+                                if let Some(revolute) = joint.as_revolute_mut() {
+                                    if let Some(_) = revolute.motor() {
+                                        if event.velocities.len() < actuator_index {
+                                            panic!("not enough control parameters provided");
+                                        }
+
+                                        let target_velocity = event.velocities[actuator_index];
+                                        link.joint.data.set_motor_velocity(
+                                            JointAxis::AngX,
+                                            target_velocity,
+                                            1.0,
+                                        );
+
+                                        actuator_index += 1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
