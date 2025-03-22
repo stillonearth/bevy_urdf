@@ -1,12 +1,14 @@
-use bevy::prelude::*;
-use bevy_rapier3d::prelude::RapierRigidBodySet;
-use rapier3d::prelude::Collider;
+use bevy::{prelude::*, reflect::Map, utils::hashbrown::HashMap};
+use bevy_rapier3d::prelude::{RapierContextJoints, RapierRigidBodySet};
+use rapier3d::prelude::{Collider, MultibodyLink};
+use rapier3d_urdf::UrdfRobot;
 use urdf_rs::{Geometry, Pose};
 
 use crate::{
     events::{
         handle_load_robot, handle_spawn_robot, handle_wait_robot_loaded, LoadRobot, RobotLoaded,
-        SpawnRobot, UrdfRobotRigidBodyHandle, WaitRobotLoaded,
+        RobotSpawned, SensorsRead, SpawnRobot, URDFRobot, UrdfRobotRigidBodyHandle,
+        WaitRobotLoaded,
     },
     urdf_asset_loader::{self, UrdfAsset},
 };
@@ -16,9 +18,11 @@ impl Plugin for UrdfPlugin {
     fn build(&self, app: &mut App) {
         app.init_asset_loader::<urdf_asset_loader::RpyAssetLoader>()
             .add_event::<SpawnRobot>()
+            .add_event::<RobotSpawned>()
             .add_event::<WaitRobotLoaded>()
             .add_event::<LoadRobot>()
             .add_event::<RobotLoaded>()
+            .add_event::<SensorsRead>()
             .add_systems(Update, sync_robot_geometry)
             .add_systems(
                 Update,
@@ -26,6 +30,7 @@ impl Plugin for UrdfPlugin {
                     handle_spawn_robot,
                     handle_load_robot,
                     handle_wait_robot_loaded,
+                    read_sensors,
                 ),
             )
             .init_asset::<urdf_asset_loader::UrdfAsset>();
@@ -77,11 +82,69 @@ fn sync_robot_geometry(
                     rapier_pos.translation.y,
                     rapier_pos.translation.z,
                 );
-                let bevy_vec = quat_fix.mul_vec3(rapier_vec);
-                // bevy_vec.y *= -1.0;
 
+                let bevy_vec = quat_fix.mul_vec3(rapier_vec);
                 *transform = Transform::from_translation(bevy_vec).with_rotation(bevy_quat);
             }
         }
+    }
+}
+
+fn read_sensors(
+    q_urdf_robots: Query<(Entity, &URDFRobot)>,
+    q_urdf_rigid_bodies: Query<(Entity, &Parent, &Transform, &UrdfRobotRigidBodyHandle)>,
+    mut ew_sensors_read: EventWriter<SensorsRead>,
+    q_rapier_joints: Query<(&RapierContextJoints, &RapierRigidBodySet)>,
+) {
+    let mut readings_hashmap: HashMap<Handle<UrdfAsset>, Vec<Transform>> = HashMap::new();
+    let mut joint_angles: HashMap<Handle<UrdfAsset>, Vec<f32>> = HashMap::new();
+
+    for (parent_entity, urdf_robot) in &mut q_urdf_robots.iter() {
+        for (_, parent, transform, _) in q_urdf_rigid_bodies.iter() {
+            if parent_entity.index() == parent.get().index() {
+                readings_hashmap
+                    .entry(urdf_robot.handle.clone())
+                    .or_insert_with(Vec::new)
+                    .push(transform.clone());
+            }
+        }
+
+        for (rapier_context_joints, rapier_rigid_bodies) in q_rapier_joints.iter() {
+            for joint_link_handle in urdf_robot.rapier_handles.joints.iter() {
+                // println!("joint handle: {:?}", .)
+                if let Some(handle) = joint_link_handle.joint {
+                    if let Some((multibody, index)) =
+                        rapier_context_joints.multibody_joints.get(handle)
+                    {
+                        if let Some(link) = multibody.link(index) {
+                            let joint = link.joint.data;
+
+                            let body_1_link = joint_link_handle.link1;
+                            let body_2_link = joint_link_handle.link2;
+
+                            if let Some(revolute) = joint.as_revolute() {
+                                let rb1 = rapier_rigid_bodies.bodies.get(body_1_link).unwrap();
+                                let rb2 = rapier_rigid_bodies.bodies.get(body_2_link).unwrap();
+
+                                let angle = revolute.angle(rb1.rotation(), rb2.rotation());
+
+                                joint_angles
+                                    .entry(urdf_robot.handle.clone())
+                                    .or_insert_with(Vec::new)
+                                    .push(angle);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for (key, transforms) in readings_hashmap.iter() {
+        ew_sensors_read.send(SensorsRead {
+            transforms: transforms.clone(),
+            handle: key.clone(),
+            joint_angles: joint_angles.entry(key.clone()).or_default().clone(),
+        });
     }
 }

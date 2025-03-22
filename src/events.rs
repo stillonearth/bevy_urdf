@@ -17,6 +17,11 @@ pub struct SpawnRobot {
 }
 
 #[derive(Clone, Event)]
+pub struct RobotSpawned {
+    pub handle: Handle<UrdfAsset>,
+}
+
+#[derive(Clone, Event)]
 pub struct WaitRobotLoaded {
     pub handle: Handle<UrdfAsset>,
     pub mesh_dir: String,
@@ -34,8 +39,18 @@ pub struct LoadRobot {
     pub mesh_dir: String,
 }
 
-#[derive(Component, Default)]
-pub struct UrdfRobot {}
+#[derive(Component)]
+pub struct URDFRobot {
+    pub handle: Handle<UrdfAsset>,
+    pub rapier_handles: UrdfRobotHandles<Option<MultibodyJointHandle>>,
+}
+
+#[derive(Event)]
+pub struct SensorsRead {
+    pub handle: Handle<UrdfAsset>,
+    pub transforms: Vec<Transform>,
+    pub joint_angles: Vec<f32>,
+}
 
 #[derive(Component, Default, Deref)]
 pub struct UrdfRobotRigidBodyHandle(pub RigidBodyHandle);
@@ -56,19 +71,21 @@ pub(crate) fn handle_spawn_robot(
     q_rapier_context_simulation: Query<(Entity, &RapierContextSimulation)>,
     mut er_spawn_robot: EventReader<SpawnRobot>,
     mut ew_wait_robot_loaded: EventWriter<WaitRobotLoaded>,
+    mut ew_robot_spawned: EventWriter<RobotSpawned>,
 ) {
     for event in er_spawn_robot.read() {
         let rapier_context_simulation_entity = q_rapier_context_simulation.iter().next().unwrap().0;
         let robot_handle = event.handle.clone();
         if let Some(urdf) = urdf_assets.get(robot_handle.id()) {
-            let mut handles: Option<UrdfRobotHandles<Option<MultibodyJointHandle>>> = None;
+            let mut maybe_rapier_handles: Option<UrdfRobotHandles<Option<MultibodyJointHandle>>> =
+                None;
             // let mut handles: Option<UrdfRobotHandles<ImpulseJointHandle>> = None;
             for (_entity, mut rigid_body_set, mut collider_set, mut multibidy_joint_set) in
                 q_rapier_context.iter_mut()
             {
                 let urdf_robot = urdf.urdf_robot.clone();
 
-                handles = Some(urdf_robot.clone().insert_using_multibody_joints(
+                maybe_rapier_handles = Some(urdf_robot.clone().insert_using_multibody_joints(
                     &mut rigid_body_set.bodies,
                     &mut collider_set.colliders,
                     &mut multibidy_joint_set.multibody_joints,
@@ -77,23 +94,23 @@ pub(crate) fn handle_spawn_robot(
                 break;
             }
 
-            if handles.is_none() {
+            if maybe_rapier_handles.is_none() {
                 panic!("couldn't initialize handles");
             }
 
-            let body_handles: Vec<RigidBodyHandle> = handles
-                .unwrap()
-                .links
-                .iter()
-                .map(|link| link.body)
-                .collect();
+            let rapier_handles = maybe_rapier_handles.unwrap();
+            let body_handles: Vec<RigidBodyHandle> =
+                rapier_handles.links.iter().map(|link| link.body).collect();
             let geoms = extract_robot_geometry(urdf);
 
             assert_eq!(body_handles.len(), geoms.len());
 
             commands
                 .spawn((
-                    UrdfRobot {},
+                    URDFRobot {
+                        handle: event.handle.clone(),
+                        rapier_handles: rapier_handles,
+                    },
                     Transform::IDENTITY.with_rotation(Quat::from_rotation_x(std::f32::consts::PI)),
                     Name::new("URDF Robot"),
                     InheritedVisibility::VISIBLE,
@@ -155,6 +172,10 @@ pub(crate) fn handle_spawn_robot(
                         ));
                     }
                 });
+
+            ew_robot_spawned.send(RobotSpawned {
+                handle: event.handle.clone(),
+            });
         } else {
             ew_wait_robot_loaded.send(WaitRobotLoaded {
                 handle: event.handle.clone(),

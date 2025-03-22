@@ -6,9 +6,12 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
 
-use bevy_urdf_rapier::events::SpawnRobot;
-use bevy_urdf_rapier::events::{LoadRobot, RobotLoaded};
-use bevy_urdf_rapier::plugin::UrdfPlugin;
+use bevy_urdf::events::{LoadRobot, RobotLoaded};
+use bevy_urdf::events::{RobotSpawned, URDFRobot, UrdfRobotRigidBodyHandle};
+use bevy_urdf::events::{SensorsRead, SpawnRobot};
+use bevy_urdf::plugin::UrdfPlugin;
+use bevy_urdf::urdf_asset_loader::UrdfAsset;
+use rapier3d::prelude::JointEnabled;
 
 fn main() {
     App::new()
@@ -26,12 +29,18 @@ fn main() {
             speed: 1.0,
             ..default()
         })
+        .insert_resource(UrdfRobotHandle(None))
         .add_systems(Startup, setup)
+        .add_systems(Update, (control_joint_motors, print_sensor_values))
         .add_systems(Update, start_simulation.run_if(in_state(AppState::Loading)))
         .run();
 }
 
+#[derive(Resource)]
+struct UrdfRobotHandle(Option<Handle<UrdfAsset>>);
+
 fn start_simulation(
+    mut commands: Commands,
     mut er_robot_loaded: EventReader<RobotLoaded>,
     mut ew_spawn_robot: EventWriter<SpawnRobot>,
     mut state: ResMut<NextState<AppState>>,
@@ -42,6 +51,57 @@ fn start_simulation(
             mesh_dir: event.mesh_dir.clone(),
         });
         state.set(AppState::Simulation);
+        commands.insert_resource(UrdfRobotHandle(Some(event.handle.clone())));
+    }
+}
+
+fn print_sensor_values(mut er_read_sensors: EventReader<SensorsRead>) {
+    for event in er_read_sensors.read() {
+        println!("Robot: {:?}", event.handle.id());
+        println!("\transforms:");
+        for transform in &event.transforms {
+            let trans = transform.translation;
+            let rot = transform.rotation;
+            println!(
+                "\t{} {} {} {} {} {} {}",
+                trans.x, trans.y, trans.z, rot.x, rot.y, rot.z, rot.w
+            );
+        }
+
+        let joint_angles_string: Vec<String> =
+            event.joint_angles.iter().map(|a| a.to_string()).collect();
+        println!("\tjoint_angles:");
+        println!("\t{}", joint_angles_string.join(" "));
+    }
+}
+
+fn control_joint_motors(
+    mut q_rapier_joints: Query<(&mut RapierContextJoints,)>,
+    urdf_assets: Res<Assets<UrdfAsset>>,
+    robot_handle: Res<UrdfRobotHandle>,
+) {
+    if let Some(handle) = robot_handle.0.clone() {
+        if let Some(urdf_asset) = urdf_assets.get(handle.id()) {
+            for mut rapier_context_joints in q_rapier_joints.iter_mut() {
+                let urdf_robot = urdf_asset.urdf_robot.clone();
+                for joint in urdf_robot.joints {
+                    if let Some(revolute) = joint.joint.as_revolute() {
+                        if let Some(motor) = revolute.motor() {
+                            println!("motor value {:?}", motor);
+                        }
+                        // println!("joint: {:?}",)
+                    }
+
+                    // println!("joint value {:?}", joint.as
+                    // if joint.joint.enabled == JointEnabled::Enabled {
+                    //     for (handle, link, _, _) in rapier_context_joints.0.multibody_joints.iter()
+                    //     {
+                    //         link.
+                    //     }
+                    // }
+                }
+            }
+        }
     }
 }
 
@@ -75,18 +135,10 @@ fn setup(
 
     // ground
     commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(1.8, 1.8, 1.8))),
+        Mesh3d(meshes.add(Cuboid::new(180., 1.8, 180.))),
         MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-        Collider::cuboid(0.9, 0.9, 0.9),
+        Collider::cuboid(90., 0.9, 90.),
         Transform::from_xyz(0.0, -2.5, 0.0),
-        RigidBody::Fixed,
-    ));
-
-    commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(1.8, 1.8, 1.8))),
-        MeshMaterial3d(materials.add(Color::srgba(0.2, 0.7, 0.1, 0.1))),
-        Collider::cuboid(0.9, 0.9, 0.9),
-        Transform::from_xyz(0.0, 2.5, 0.0),
         RigidBody::Fixed,
     ));
 

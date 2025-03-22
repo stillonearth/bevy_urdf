@@ -17,6 +17,8 @@ bevy_stl = "0.15"
 rapier_testbed3d = "0.23.1"
 urdf-rs = "0.9"
 thiserror = "2.0"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
 bevy_flycam = "0.15.0"
 bevy-inspector-egui = "0.30.0"
-serde = { version = "1", features = ["derive"] }

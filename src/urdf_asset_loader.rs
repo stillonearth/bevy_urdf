@@ -42,10 +42,8 @@ impl AssetLoader for RpyAssetLoader {
         settings: &RpyAssetLoaderSettings,
         _load_context: &mut LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {
-        // read urdf file to memory
         let mut bytes = Vec::new();
         reader.read_to_end(&mut bytes).await?;
-        // urdf file content
         let content = std::str::from_utf8(&bytes).unwrap();
 
         let options = UrdfLoaderOptions {
@@ -63,8 +61,6 @@ impl AssetLoader for RpyAssetLoader {
         let mesh_dir = Path::new(&mesh_dir);
 
         let (urdf_robot, robot) = UrdfRobot::from_str(content, options, mesh_dir).unwrap();
-
-        // urdf_to_colliders
 
         Ok(UrdfAsset { robot, urdf_robot })
     }
