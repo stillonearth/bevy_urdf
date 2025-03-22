@@ -83,7 +83,7 @@ fn control_motors(
         let mut rng = rand::rng();
         let mut velocities: Vec<f32> = Vec::new();
 
-        for _ in 0..5 {
+        for _ in 0..6 {
             velocities.push(rng.random_range(-5.0..5.0));
         }
 

@@ -60,7 +60,18 @@ impl AssetLoader for RpyAssetLoader {
         let mesh_dir = settings.clone().mesh_dir.unwrap_or("./".to_string());
         let mesh_dir = Path::new(&mesh_dir);
 
-        let (urdf_robot, robot) = UrdfRobot::from_str(content, options, mesh_dir).unwrap();
+        let (mut urdf_robot, robot) = UrdfRobot::from_str(content, options, mesh_dir).unwrap();
+        let mut robot_joints = urdf_robot.joints.clone();
+
+        // hotfix robot revolute joints
+        for (index, urdf_joint) in robot_joints.clone().iter().enumerate() {
+            let mut joint = urdf_joint.joint.clone();
+            if let Some(_) = joint.as_revolute() {
+                joint.set_motor_velocity(JointAxis::AngX, 0.0, 1.0);
+                robot_joints[index].joint = joint;
+            }
+        }
+        urdf_robot.joints = robot_joints;
 
         Ok(UrdfAsset { robot, urdf_robot })
     }

@@ -1,6 +1,6 @@
 [package]
 name = "rapier3d-urdf"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Sébastien Crozet <sebcrozet@dimforge.com>"]
 description = "URDF file loader for the 3D rapier physics engine."
 documentation = "https://docs.rs/rapier3d-urdf"
