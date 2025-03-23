@@ -5,6 +5,7 @@ use bevy_flycam::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
+use rapier3d::prelude::InteractionGroups;
 
 use bevy_urdf::events::{ControlMotors, LoadRobot, RobotLoaded};
 use bevy_urdf::events::{SensorsRead, SpawnRobot};
@@ -121,10 +122,10 @@ fn setup(
 
     // ground
     commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(180., 1.8, 180.))),
+        Mesh3d(meshes.add(Cuboid::new(180., 0.1, 180.))),
         MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-        Collider::cuboid(90., 0.9, 90.),
-        Transform::from_xyz(0.0, -2.5, 0.0),
+        Collider::cuboid(90., 0.05, 90.),
+        Transform::from_xyz(0.0, 0.0, 0.0),
         RigidBody::Fixed,
     ));
 
@@ -137,5 +138,9 @@ fn setup(
     ew_load_robot.send(LoadRobot {
         urdf_path: "robots/flamingo_edu/urdf/Edu_v4.urdf".to_string(),
         mesh_dir: "assets/robots/flamingo_edu/urdf".to_string(),
+        interaction_groups: Some(InteractionGroups::new(
+            rapier3d::geometry::Group::GROUP_4,
+            rapier3d::geometry::Group::ALL,
+        )),
     });
 }

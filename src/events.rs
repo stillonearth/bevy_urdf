@@ -2,7 +2,7 @@ use std::path::Path;
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use rapier3d::prelude::{MultibodyJointHandle, RigidBodyHandle};
+use rapier3d::prelude::{InteractionGroups, MultibodyJointHandle, RigidBodyHandle};
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobotHandles};
 
 use crate::{
@@ -37,6 +37,7 @@ pub struct RobotLoaded {
 pub struct LoadRobot {
     pub urdf_path: String,
     pub mesh_dir: String,
+    pub interaction_groups: Option<InteractionGroups>,
 }
 
 #[derive(Component)]
@@ -197,11 +198,13 @@ pub(crate) fn handle_load_robot(
     mut ew_robot_loaded: EventWriter<RobotLoaded>,
 ) {
     for event in er_load_robot.read() {
+        let interaction_groups = event.interaction_groups.clone();
         let mesh_dir = Some(event.clone().mesh_dir);
         let robot_handle: Handle<UrdfAsset> =
             asset_server.load_with_settings(event.clone().urdf_path, move |s: &mut _| {
                 *s = RpyAssetLoaderSettings {
                     mesh_dir: mesh_dir.clone(),
+                    interaction_groups,
                 }
             });
 

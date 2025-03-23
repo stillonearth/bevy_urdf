@@ -4,7 +4,7 @@ use bevy::{
     asset::{io::Reader, AssetLoader, LoadContext},
     prelude::*,
 };
-use rapier3d::prelude::*;
+use rapier3d::{na::Translation3, prelude::*};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfRobot};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -22,6 +22,7 @@ pub struct UrdfAsset {
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
 pub struct RpyAssetLoaderSettings {
     pub mesh_dir: Option<String>,
+    pub interaction_groups: Option<InteractionGroups>,
 }
 
 #[non_exhaustive]
@@ -46,6 +47,9 @@ impl AssetLoader for RpyAssetLoader {
         reader.read_to_end(&mut bytes).await?;
         let content = std::str::from_utf8(&bytes).unwrap();
 
+        let mut isometry = Isometry::rotation(-Vector::x() * std::f32::consts::FRAC_PI_2);
+        isometry.append_translation_mut(&Translation3::new(0.0, 1.0, 0.0));
+
         let options = UrdfLoaderOptions {
             create_colliders_from_visual_shapes: true,
             create_colliders_from_collision_shapes: false,
@@ -53,7 +57,7 @@ impl AssetLoader for RpyAssetLoader {
             apply_imported_mass_props: true,
             make_roots_fixed: false,
             // Z-up to Y-up.
-            shift: Isometry::rotation(-Vector::x() * std::f32::consts::FRAC_PI_2),
+            shift: isometry,
             ..Default::default()
         };
 
@@ -63,7 +67,7 @@ impl AssetLoader for RpyAssetLoader {
         let (mut urdf_robot, robot) = UrdfRobot::from_str(content, options, mesh_dir).unwrap();
         let mut robot_joints = urdf_robot.joints.clone();
 
-        // hotfix robot revolute joints
+        // hotfix robot revolute joints motors
         for (index, urdf_joint) in robot_joints.clone().iter().enumerate() {
             let mut joint = urdf_joint.joint.clone();
             if let Some(_) = joint.as_revolute() {
@@ -72,6 +76,23 @@ impl AssetLoader for RpyAssetLoader {
             }
         }
         urdf_robot.joints = robot_joints;
+
+        // apply custom collision groups
+        if let Some(mut adjusted_interaction_groups) = settings.interaction_groups {
+            let mut robot_links = urdf_robot.links.clone();
+            for (body_index, urdf_link) in robot_links.clone().iter().enumerate() {
+                for (collider_index, collider) in urdf_link.colliders.clone().iter().enumerate() {
+                    let mut collider = collider.clone();
+                    let urdf_interactions_groups = collider.collision_groups();
+
+                    adjusted_interaction_groups.filter = urdf_interactions_groups.filter;
+
+                    collider.set_collision_groups(adjusted_interaction_groups);
+                    robot_links[body_index].colliders[collider_index] = collider;
+                }
+            }
+            urdf_robot.links = robot_links;
+        }
 
         Ok(UrdfAsset { robot, urdf_robot })
     }

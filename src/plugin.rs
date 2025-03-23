@@ -127,10 +127,6 @@ fn read_sensors(
                                 let rb1 = rapier_rigid_bodies.bodies.get(body_1_link).unwrap();
                                 let rb2 = rapier_rigid_bodies.bodies.get(body_2_link).unwrap();
 
-                                if let Some(motor) = revolute.motor() {
-                                    println!("motor: {:?}", motor);
-                                }
-
                                 let angle = revolute.angle(rb1.rotation(), rb2.rotation());
 
                                 joint_angles
