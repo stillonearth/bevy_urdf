@@ -55,7 +55,7 @@ impl AssetLoader for RpyAssetLoader {
             create_colliders_from_collision_shapes: false,
             enable_joint_collisions: true,
             apply_imported_mass_props: true,
-            make_roots_fixed: true,
+            make_roots_fixed: false,
             // Z-up to Y-up.
             shift: isometry,
             ..Default::default()

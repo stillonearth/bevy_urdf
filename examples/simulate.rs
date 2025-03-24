@@ -123,13 +123,13 @@ fn setup(
     ));
 
     // ground
-    // commands.spawn((
-    //     Mesh3d(meshes.add(Cuboid::new(180., 0.1, 180.))),
-    //     MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-    //     Collider::cuboid(90., 0.05, 90.),
-    //     Transform::from_xyz(0.0, -5.0, 0.0),
-    //     RigidBody::Fixed,
-    // ));
+    commands.spawn((
+        Mesh3d(meshes.add(Cuboid::new(180., 0.1, 180.))),
+        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+        Collider::cuboid(90., 0.05, 90.),
+        Transform::from_xyz(0.0, -5.0, 0.0),
+        RigidBody::Fixed,
+    ));
 
     // load robot
     // ew_load_robot.send(LoadRobot {
