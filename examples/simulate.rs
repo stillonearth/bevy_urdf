@@ -132,11 +132,11 @@ fn setup(
     ));
 
     // load robot
-    ew_load_robot.send(LoadRobot {
-        urdf_path: "robots/unitree_a1/urdf/a1.urdf".to_string(),
-        mesh_dir: "assets/robots/unitree_a1/urdf".to_string(),
-        interaction_groups: None,
-    });
+    // ew_load_robot.send(LoadRobot {
+    //     urdf_path: "robots/unitree_a1/urdf/a1.urdf".to_string(),
+    //     mesh_dir: "assets/robots/unitree_a1/urdf".to_string(),
+    //     interaction_groups: None,
+    // });
 
     // ew_load_robot.send(LoadRobot {
     //     urdf_path: "robots/flamingo_edu/urdf/Edu_v4.urdf".to_string(),
@@ -147,9 +147,9 @@ fn setup(
     //     )),
     // });
 
-    // ew_load_robot.send(LoadRobot {
-    //     urdf_path: "robots/m2020/MHS.urdf".to_string(),
-    //     mesh_dir: "assets/robots/m2020".to_string(),
-    //     interaction_groups: None,
-    // });
+    ew_load_robot.send(LoadRobot {
+        urdf_path: "robots/rover/m2020.urdf".to_string(),
+        mesh_dir: "assets/robots/m2020".to_string(),
+        interaction_groups: None,
+    });
 }
