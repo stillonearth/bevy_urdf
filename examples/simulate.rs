@@ -137,18 +137,18 @@ fn setup(
     //     mesh_dir: "assets/robots/unitree_a1/urdf".to_string(),
     // });
 
-    // ew_load_robot.send(LoadRobot {
-    //     urdf_path: "robots/flamingo_edu/urdf/Edu_v4.urdf".to_string(),
-    //     mesh_dir: "assets/robots/flamingo_edu/urdf".to_string(),
-    //     interaction_groups: Some(InteractionGroups::new(
-    //         rapier3d::geometry::Group::GROUP_4,
-    //         rapier3d::geometry::Group::ALL,
-    //     )),
-    // });
-
     ew_load_robot.send(LoadRobot {
-        urdf_path: "robots/m2020/MHS.urdf".to_string(),
-        mesh_dir: "assets/robots/m2020".to_string(),
-        interaction_groups: None,
+        urdf_path: "robots/flamingo_edu/urdf/Edu_v4.urdf".to_string(),
+        mesh_dir: "assets/robots/flamingo_edu/urdf".to_string(),
+        interaction_groups: Some(InteractionGroups::new(
+            rapier3d::geometry::Group::GROUP_4,
+            rapier3d::geometry::Group::ALL,
+        )),
     });
+
+    // ew_load_robot.send(LoadRobot {
+    //     urdf_path: "robots/m2020/MHS.urdf".to_string(),
+    //     mesh_dir: "assets/robots/m2020".to_string(),
+    //     interaction_groups: None,
+    // });
 }
