@@ -58,7 +58,6 @@ fn start_simulation(
 
 fn print_sensor_values(mut er_read_sensors: EventReader<SensorsRead>) {
     for event in er_read_sensors.read() {
-        return;
         println!("Robot: {:?}", event.handle.id());
         println!("\transforms:");
         for transform in &event.transforms {
@@ -82,7 +81,6 @@ fn control_motors(
     mut ew_control_motors: EventWriter<ControlMotors>,
 ) {
     if let Some(handle) = robot_handle.0.clone() {
-        return;
         let mut rng = rand::rng();
         let mut velocities: Vec<f32> = Vec::new();
 
@@ -116,7 +114,7 @@ fn setup(
 
     commands.spawn((
         Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 0.0, 0.0), //.looking_at(Vec3::ZERO, Vec3::Y),
+            transform: Transform::from_xyz(3.0, 3.0, 3.0).looking_at(Vec3::ZERO, Vec3::Y),
             ..default()
         },
         FlyCam,
@@ -127,25 +125,25 @@ fn setup(
         Mesh3d(meshes.add(Cuboid::new(180., 0.1, 180.))),
         MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
         Collider::cuboid(90., 0.05, 90.),
-        Transform::from_xyz(0.0, -5.0, 0.0),
+        Transform::from_xyz(0.0, -2.0, 0.0),
         RigidBody::Fixed,
     ));
 
     // load robot
-    ew_load_robot.send(LoadRobot {
-        urdf_path: "robots/unitree_a1/urdf/a1.urdf".to_string(),
-        mesh_dir: "assets/robots/unitree_a1/urdf".to_string(),
-        interaction_groups: None,
-    });
-
     // ew_load_robot.send(LoadRobot {
-    //     urdf_path: "robots/flamingo_edu/urdf/Edu_v4.urdf".to_string(),
-    //     mesh_dir: "assets/robots/flamingo_edu/urdf".to_string(),
-    //     interaction_groups: Some(InteractionGroups::new(
-    //         rapier3d::geometry::Group::GROUP_4,
-    //         rapier3d::geometry::Group::ALL,
-    //     )),
+    //     urdf_path: "robots/unitree_a1/urdf/a1.urdf".to_string(),
+    //     mesh_dir: "assets/robots/unitree_a1/urdf".to_string(),
+    //     interaction_groups: None,
     // });
+
+    ew_load_robot.send(LoadRobot {
+        urdf_path: "robots/flamingo_edu/urdf/Edu_v4.urdf".to_string(),
+        mesh_dir: "assets/robots/flamingo_edu/urdf".to_string(),
+        interaction_groups: Some(InteractionGroups::new(
+            rapier3d::geometry::Group::GROUP_4,
+            rapier3d::geometry::Group::ALL,
+        )),
+    });
 
     // ew_load_robot.send(LoadRobot {
     //     urdf_path: "robots/m2020/MHS.urdf".to_string(),
