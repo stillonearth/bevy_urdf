@@ -57,8 +57,8 @@ fn start_simulation(
 }
 
 fn print_sensor_values(mut er_read_sensors: EventReader<SensorsRead>) {
+    return;
     for event in er_read_sensors.read() {
-        return;
         println!("Robot: {:?}", event.handle.id());
         println!("\transforms:");
         for transform in &event.transforms {
@@ -82,11 +82,10 @@ fn control_motors(
     mut ew_control_motors: EventWriter<ControlMotors>,
 ) {
     if let Some(handle) = robot_handle.0.clone() {
-        return;
         let mut rng = rand::rng();
         let mut velocities: Vec<f32> = Vec::new();
 
-        for _ in 0..6 {
+        for _ in 0..50 {
             velocities.push(rng.random_range(-5.0..5.0));
         }
 
@@ -123,13 +122,13 @@ fn setup(
     ));
 
     // ground
-    commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(180., 0.1, 180.))),
-        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-        Collider::cuboid(90., 0.05, 90.),
-        Transform::from_xyz(0.0, -5.0, 0.0),
-        RigidBody::Fixed,
-    ));
+    // commands.spawn((
+    //     Mesh3d(meshes.add(Cuboid::new(180., 0.1, 180.))),
+    //     MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+    //     Collider::cuboid(90., 0.05, 90.),
+    //     Transform::from_xyz(0.0, -5.0, 0.0),
+    //     RigidBody::Fixed,
+    // ));
 
     // load robot
     // ew_load_robot.send(LoadRobot {

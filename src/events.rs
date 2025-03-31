@@ -14,6 +14,7 @@ use crate::{
 pub struct SpawnRobot {
     pub handle: Handle<UrdfAsset>,
     pub mesh_dir: String,
+    pub parent_entity: Option<Entity>,
 }
 
 #[derive(Clone, Event)]
@@ -25,12 +26,14 @@ pub struct RobotSpawned {
 pub struct WaitRobotLoaded {
     pub handle: Handle<UrdfAsset>,
     pub mesh_dir: String,
+    pub parent_entity: Option<Entity>,
 }
 
 #[derive(Clone, Event)]
 pub struct RobotLoaded {
     pub handle: Handle<UrdfAsset>,
     pub mesh_dir: String,
+    pub marker: Option<u32>,
 }
 
 #[derive(Clone, Event)]
@@ -38,6 +41,8 @@ pub struct LoadRobot {
     pub urdf_path: String,
     pub mesh_dir: String,
     pub interaction_groups: Option<InteractionGroups>,
+    /// this field can be used to keep causality of `LoadRobot -> RobotLoaded`` event chain
+    pub marker: Option<u32>,
 }
 
 #[derive(Component)]
@@ -112,14 +117,19 @@ pub(crate) fn handle_spawn_robot(
 
             assert_eq!(body_handles.len(), geoms.len());
 
-            commands
-                .spawn((
+            let mut ec = if let Some(parent_entity) = event.parent_entity {
+                commands.entity(parent_entity)
+            } else {
+                commands.spawn(())
+            };
+
+            ec
+                .insert((
                     URDFRobot {
                         handle: event.handle.clone(),
                         rapier_handles: rapier_handles,
                     },
                     Transform::IDENTITY.with_rotation(Quat::from_rotation_x(std::f32::consts::PI)),
-                    Name::new("URDF Robot"),
                     InheritedVisibility::VISIBLE,
                 ))
                 .with_children(|children| {
@@ -187,6 +197,7 @@ pub(crate) fn handle_spawn_robot(
             ew_wait_robot_loaded.send(WaitRobotLoaded {
                 handle: event.handle.clone(),
                 mesh_dir: event.mesh_dir.clone(),
+                parent_entity: event.parent_entity.clone(),
             });
         }
     }
@@ -211,6 +222,7 @@ pub(crate) fn handle_load_robot(
         ew_robot_loaded.send(RobotLoaded {
             handle: robot_handle,
             mesh_dir: event.mesh_dir.clone().replace("assets/", ""),
+            marker: event.marker,
         });
     }
 }
@@ -222,6 +234,7 @@ pub(crate) fn handle_wait_robot_loaded(
         ew_spawn_robot.send(SpawnRobot {
             handle: event.handle.clone(),
             mesh_dir: event.mesh_dir.clone(),
+            parent_entity: event.parent_entity,
         });
     }
 }
