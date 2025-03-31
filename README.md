@@ -70,3 +70,8 @@ pub struct ControlMotors {
 
 You may need to hand-inspect urdf files to ensure mesh links are relative to urdf file. `package://` and links and gazebo nodes are not supported.
 
+## Examples
+
+```bash
+cargo run --example simulate --release
+```

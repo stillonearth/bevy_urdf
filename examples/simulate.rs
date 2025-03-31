@@ -50,6 +50,7 @@ fn start_simulation(
         ew_spawn_robot.send(SpawnRobot {
             handle: event.handle.clone(),
             mesh_dir: event.mesh_dir.clone(),
+            parent_entity: None,
         });
         state.set(AppState::Simulation);
         commands.insert_resource(UrdfRobotHandle(Some(event.handle.clone())));
@@ -115,40 +116,34 @@ fn setup(
 
     commands.spawn((
         Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 0.0, 0.0), //.looking_at(Vec3::ZERO, Vec3::Y),
+            transform: Transform::from_xyz(3.0, 3.0, 3.0).looking_at(Vec3::ZERO, Vec3::Y),
             ..default()
         },
         FlyCam,
     ));
 
     // ground
-    // commands.spawn((
-    //     Mesh3d(meshes.add(Cuboid::new(180., 0.1, 180.))),
-    //     MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-    //     Collider::cuboid(90., 0.05, 90.),
-    //     Transform::from_xyz(0.0, -5.0, 0.0),
-    //     RigidBody::Fixed,
-    // ));
+    commands.spawn((
+        Mesh3d(meshes.add(Cuboid::new(180., 0.1, 180.))),
+        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+        Collider::cuboid(90., 0.05, 90.),
+        Transform::from_xyz(0.0, -1.0, 0.0),
+        RigidBody::Fixed,
+    ));
 
     // load robot
+    ew_load_robot.send(LoadRobot {
+        urdf_path: "robots/unitree_a1/urdf/a1.urdf".to_string(),
+        mesh_dir: "assets/robots/unitree_a1/urdf".to_string(),
+        interaction_groups: None,
+        marker: None,
+    });
+
     // ew_load_robot.send(LoadRobot {
     //     urdf_path: "robots/unitree_a1/urdf/a1.urdf".to_string(),
     //     mesh_dir: "assets/robots/unitree_a1/urdf".to_string(),
     //     interaction_groups: None,
+    //     marker: None,
     // });
 
-    // ew_load_robot.send(LoadRobot {
-    //     urdf_path: "robots/flamingo_edu/urdf/Edu_v4.urdf".to_string(),
-    //     mesh_dir: "assets/robots/flamingo_edu/urdf".to_string(),
-    //     interaction_groups: Some(InteractionGroups::new(
-    //         rapier3d::geometry::Group::GROUP_4,
-    //         rapier3d::geometry::Group::ALL,
-    //     )),
-    // });
-
-    ew_load_robot.send(LoadRobot {
-        urdf_path: "robots/rover/m2020.urdf".to_string(),
-        mesh_dir: "assets/robots/m2020".to_string(),
-        interaction_groups: None,
-    });
 }
