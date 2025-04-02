@@ -58,7 +58,6 @@ fn start_simulation(
 }
 
 fn print_sensor_values(mut er_read_sensors: EventReader<SensorsRead>) {
-    return;
     for event in er_read_sensors.read() {
         println!("Robot: {:?}", event.handle.id());
         println!("\transforms:");

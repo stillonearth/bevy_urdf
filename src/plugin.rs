@@ -1,7 +1,11 @@
-use bevy::{prelude::*, utils::hashbrown::HashMap};
+use bevy::{math::VectorSpace, prelude::*, utils::hashbrown::HashMap};
 use bevy_rapier3d::prelude::{RapierContextJoints, RapierRigidBodySet};
 use rand::Rng;
-use rapier3d::prelude::{Collider, JointAxis, MotorModel};
+use rapier3d::{
+    na::Translation,
+    prelude::{Collider, JointAxis, MotorModel},
+};
+use rapier3d_urdf::UrdfRobot;
 use urdf_rs::{Geometry, Pose};
 
 use crate::{
@@ -24,7 +28,10 @@ impl Plugin for UrdfPlugin {
             .add_event::<RobotLoaded>()
             .add_event::<SensorsRead>()
             .add_event::<ControlMotors>()
-            .add_systems(Update, sync_robot_geometry)
+            .add_systems(
+                Update,
+                (sync_robot_geometry, adjust_urdf_robot_mean_position).chain(),
+            )
             .add_systems(
                 Update,
                 (
@@ -88,6 +95,58 @@ fn sync_robot_geometry(
                 let bevy_vec = quat_fix.mul_vec3(rapier_vec);
                 *transform = Transform::from_translation(bevy_vec).with_rotation(bevy_quat);
             }
+        }
+    }
+}
+
+/// move parent entity of robot to the ceenter of robot's parts, and adjust robot's parts positions accordingly
+fn adjust_urdf_robot_mean_position(
+    mut q_rapier_robot_bodies: Query<(Entity, &UrdfRobotRigidBodyHandle, &mut Transform, &Parent)>,
+    mut q_urdf_robots: Query<(Entity, &mut Transform, &URDFRobot), Without<UrdfRobotRigidBodyHandle>>,
+) {
+    let mut robot_parts: HashMap<Handle<UrdfAsset>, Vec<Transform>> = HashMap::new();
+    for (_, _, transform, parent) in q_rapier_robot_bodies.iter() {
+        let urdf_robot_result = q_urdf_robots
+            .get(parent.get())
+            .map(|(_, _, urdf)| urdf.handle.clone());
+
+        if urdf_robot_result.is_ok() {
+            robot_parts
+                .entry(urdf_robot_result.unwrap())
+                .or_default()
+                .push(transform.clone());
+        }
+    }
+
+    let mut mean_translations: HashMap<Handle<UrdfAsset>, Vec3> = HashMap::new();
+    // Calculate mean transfrom for each URDF asset
+    for (urdf_handle, transforms) in robot_parts.iter() {
+        let mut mean_transform = Vec3::ZERO;
+        for transform in transforms {
+            mean_transform += transform.translation;
+        }
+        mean_transform /= transforms.len() as f32;
+        mean_translations
+            .entry(urdf_handle.clone())
+            .insert(mean_transform);
+    }
+
+    // set urdf_robots translation to mean transform
+    for (_, mut transform, urdf_robot) in q_urdf_robots.iter_mut() {
+        if let Some(mean_translation) = mean_translations.get(&urdf_robot.handle.clone()) {
+            transform.translation = mean_translation.clone();
+        }
+    }
+
+    // subtract mean translation from each URDF asset
+    for (_, _, mut transform, parent) in q_rapier_robot_bodies.iter_mut() {
+        let parent = q_urdf_robots.get(parent.get());
+        if parent.is_err() {
+            continue;
+        }
+        let handle = parent.unwrap().2.handle.clone();
+        if let Some(mean_translation) = mean_translations.get(&handle) {
+            transform.translation -= mean_translation;
         }
     }
 }
