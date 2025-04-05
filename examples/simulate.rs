@@ -59,6 +59,7 @@ fn start_simulation(
 
 fn print_sensor_values(mut er_read_sensors: EventReader<SensorsRead>) {
     for event in er_read_sensors.read() {
+        continue;
         println!("Robot: {:?}", event.handle.id());
         println!("\transforms:");
         for transform in &event.transforms {
@@ -131,18 +132,15 @@ fn setup(
     ));
 
     // load robot
+
+    // "flamingo_edu/urdf/Edu_v4.urdf".to_string(),
+    //             "assets/flamingo_edu/urdf".to_string(),
+
     ew_load_robot.send(LoadRobot {
-        urdf_path: "robots/unitree_a1/urdf/a1.urdf".to_string(),
-        mesh_dir: "assets/robots/unitree_a1/urdf".to_string(),
+        urdf_path: "robots/flamingo_edu/urdf/Edu_v4.urdf".to_string(),
+        mesh_dir: "assets/robots/flamingo_edu/urdf/".to_string(),
         interaction_groups: None,
         marker: None,
     });
-
-    // ew_load_robot.send(LoadRobot {
-    //     urdf_path: "robots/unitree_a1/urdf/a1.urdf".to_string(),
-    //     mesh_dir: "assets/robots/unitree_a1/urdf".to_string(),
-    //     interaction_groups: None,
-    //     marker: None,
-    // });
 
 }

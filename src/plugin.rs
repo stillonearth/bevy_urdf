@@ -101,6 +101,7 @@ fn adjust_urdf_robot_mean_position(
     mut q_rapier_robot_bodies: Query<(Entity, &UrdfRobotRigidBodyHandle, &mut Transform, &Parent)>,
     mut q_urdf_robots: Query<(Entity, &mut Transform, &URDFRobot), Without<UrdfRobotRigidBodyHandle>>,
 ) {
+    return;
     let mut robot_parts: HashMap<Handle<UrdfAsset>, Vec<Transform>> = HashMap::new();
     for (_, _, transform, parent) in q_rapier_robot_bodies.iter() {
         let urdf_robot_result = q_urdf_robots
@@ -122,7 +123,7 @@ fn adjust_urdf_robot_mean_position(
         for transform in transforms {
             mean_transform += transform.translation;
         }
-        mean_transform /= transforms.len() as f32;
+        mean_transform /= -(transforms.len() as f32);
         mean_translations
             .entry(urdf_handle.clone())
             .insert(mean_transform);

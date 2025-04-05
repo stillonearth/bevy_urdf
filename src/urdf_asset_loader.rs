@@ -47,8 +47,8 @@ impl AssetLoader for RpyAssetLoader {
         reader.read_to_end(&mut bytes).await?;
         let content = std::str::from_utf8(&bytes).unwrap();
 
-        let mut isometry = Isometry::rotation(-Vector::x() * std::f32::consts::FRAC_PI_2);
-        isometry.append_translation_mut(&Translation3::new(0.0, 1.0, 0.0));
+        let mut isometry = Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2);
+        isometry.append_translation_mut(&Translation3::new(0.0, 0.0, 0.0));
 
         let options = UrdfLoaderOptions {
             create_colliders_from_visual_shapes: true,
