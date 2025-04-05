@@ -1,11 +1,8 @@
-use bevy::{math::VectorSpace, prelude::*, utils::hashbrown::HashMap};
+use bevy::{prelude::*, utils::hashbrown::HashMap};
 use bevy_rapier3d::prelude::{RapierContextJoints, RapierRigidBodySet};
-use rand::Rng;
 use rapier3d::{
-    na::Translation,
-    prelude::{Collider, JointAxis, MotorModel},
+    prelude::{Collider},
 };
-use rapier3d_urdf::UrdfRobot;
 use urdf_rs::{Geometry, Pose};
 
 use crate::{

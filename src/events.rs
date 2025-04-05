@@ -143,12 +143,12 @@ pub(crate) fn handle_spawn_robot(
                                 size[2] as f32 * 2.0,
                                 size[1] as f32 * 2.0,
                             ))),
-                            urdf_rs::Geometry::Cylinder { radius, length } => todo!(),
-                            urdf_rs::Geometry::Capsule { radius, length } => todo!(),
+                            urdf_rs::Geometry::Cylinder { .. } => todo!(),
+                            urdf_rs::Geometry::Capsule { .. } => todo!(),
                             urdf_rs::Geometry::Sphere { radius } => {
                                 Mesh3d(meshes.add(Sphere::new(radius as f32)))
                             }
-                            urdf_rs::Geometry::Mesh { filename, scale } => {
+                            urdf_rs::Geometry::Mesh { filename, .. } => {
                                 let base_path = event.mesh_dir.as_str();
                                 let model_path = Path::new(base_path).join(filename);
                                 let model_path = model_path.to_str().unwrap();
