@@ -1,8 +1,6 @@
 use bevy::{prelude::*, utils::hashbrown::HashMap};
 use bevy_rapier3d::prelude::{RapierContextJoints, RapierRigidBodySet};
-use rapier3d::{
-    prelude::{Collider},
-};
+use rapier3d::prelude::Collider;
 use urdf_rs::{Geometry, Pose};
 
 use crate::{
@@ -79,7 +77,8 @@ fn sync_robot_geometry(
 
                 let rapier_rot = rapier_pos.rotation;
 
-                let quat_fix = Quat::from_rotation_z(std::f32::consts::PI);
+                let quat_fix = Quat::from_rotation_z(std::f32::consts::PI)
+                    * Quat::from_rotation_y(std::f32::consts::PI);
                 let bevy_quat = quat_fix
                     * Quat::from_array([rapier_rot.i, rapier_rot.j, rapier_rot.k, rapier_rot.w]);
 
@@ -99,9 +98,11 @@ fn sync_robot_geometry(
 /// move parent entity of robot to the ceenter of robot's parts, and adjust robot's parts positions accordingly
 fn adjust_urdf_robot_mean_position(
     mut q_rapier_robot_bodies: Query<(Entity, &UrdfRobotRigidBodyHandle, &mut Transform, &Parent)>,
-    mut q_urdf_robots: Query<(Entity, &mut Transform, &URDFRobot), Without<UrdfRobotRigidBodyHandle>>,
+    mut q_urdf_robots: Query<
+        (Entity, &mut Transform, &URDFRobot),
+        Without<UrdfRobotRigidBodyHandle>,
+    >,
 ) {
-    return;
     let mut robot_parts: HashMap<Handle<UrdfAsset>, Vec<Transform>> = HashMap::new();
     for (_, _, transform, parent) in q_rapier_robot_bodies.iter() {
         let urdf_robot_result = q_urdf_robots
@@ -116,17 +117,23 @@ fn adjust_urdf_robot_mean_position(
         }
     }
 
+    let quat_fix =
+        Quat::from_rotation_z(std::f32::consts::PI) * Quat::from_rotation_y(std::f32::consts::PI);
+
     let mut mean_translations: HashMap<Handle<UrdfAsset>, Vec3> = HashMap::new();
     // Calculate mean transfrom for each URDF asset
     for (urdf_handle, transforms) in robot_parts.iter() {
-        let mut mean_transform = Vec3::ZERO;
+        let mut mean_translation = Vec3::ZERO;
         for transform in transforms {
-            mean_transform += transform.translation;
+            mean_translation += transform.translation;
         }
-        mean_transform /= -(transforms.len() as f32);
+
+        mean_translation /= transforms.len() as f32;
+        mean_translation = quat_fix.mul_vec3(mean_translation);
+
         mean_translations
             .entry(urdf_handle.clone())
-            .insert(mean_transform);
+            .insert(mean_translation);
     }
 
     // set urdf_robots translation to mean transform
@@ -144,7 +151,10 @@ fn adjust_urdf_robot_mean_position(
         }
         let handle = parent.unwrap().2.handle.clone();
         if let Some(mean_translation) = mean_translations.get(&handle) {
-            transform.translation -= mean_translation;
+            let transform_fix = quat_fix.mul_vec3(mean_translation.clone());
+            transform.translation -= transform_fix;
+        } else {
+            println!("here");
         }
     }
 }

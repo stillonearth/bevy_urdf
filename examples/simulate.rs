@@ -22,7 +22,7 @@ fn main() {
             StlPlugin,
             NoCameraPlayerPlugin,
             RapierPhysicsPlugin::<NoUserData>::default(),
-            // RapierDebugRenderPlugin::default(),
+            RapierDebugRenderPlugin::default(),
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
         ))
         .init_state::<AppState>()
@@ -133,14 +133,10 @@ fn setup(
 
     // load robot
 
-    // "flamingo_edu/urdf/Edu_v4.urdf".to_string(),
-    //             "assets/flamingo_edu/urdf".to_string(),
-
     ew_load_robot.send(LoadRobot {
         urdf_path: "robots/flamingo_edu/urdf/Edu_v4.urdf".to_string(),
         mesh_dir: "assets/robots/flamingo_edu/urdf/".to_string(),
         interaction_groups: None,
         marker: None,
     });
-
 }
