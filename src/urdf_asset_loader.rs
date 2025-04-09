@@ -23,6 +23,7 @@ pub struct UrdfAsset {
 pub struct RpyAssetLoaderSettings {
     pub mesh_dir: Option<String>,
     pub interaction_groups: Option<InteractionGroups>,
+    pub translation_shift: Option<Vec3>,
 }
 
 #[non_exhaustive]
@@ -47,8 +48,15 @@ impl AssetLoader for RpyAssetLoader {
         reader.read_to_end(&mut bytes).await?;
         let content = std::str::from_utf8(&bytes).unwrap();
 
-        let mut isometry = Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2);
-        isometry.append_translation_mut(&Translation3::new(0.0, 0.0, 0.0));
+        let mut isometry: nalgebra::Isometry<f32, nalgebra::Unit<nalgebra::Quaternion<f32>>, 3> =
+            Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2);
+        if let Some(translaction_shift) = settings.translation_shift {
+            isometry.append_translation_mut(&Translation3::new(
+                translaction_shift.x,
+                translaction_shift.y,
+                translaction_shift.z,
+            ));
+        }
 
         let options = UrdfLoaderOptions {
             create_colliders_from_visual_shapes: true,

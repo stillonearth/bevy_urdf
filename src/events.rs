@@ -46,6 +46,7 @@ pub struct LoadRobot {
     pub urdf_path: String,
     pub mesh_dir: String,
     pub interaction_groups: Option<InteractionGroups>,
+    pub translation_shift: Option<Vec3>,
     /// this field can be used to keep causality of `LoadRobot -> RobotLoaded`` event chain
     pub marker: Option<u32>,
 }
@@ -267,11 +268,13 @@ pub(crate) fn handle_load_robot(
 ) {
     for event in er_load_robot.read() {
         let interaction_groups = event.interaction_groups.clone();
+        let translation_shift = event.translation_shift.clone();
         let mesh_dir = Some(event.clone().mesh_dir);
         let robot_handle: Handle<UrdfAsset> =
             asset_server.load_with_settings(event.clone().urdf_path, move |s: &mut _| {
                 *s = RpyAssetLoaderSettings {
                     mesh_dir: mesh_dir.clone(),
+                    translation_shift,
                     interaction_groups,
                 }
             });
