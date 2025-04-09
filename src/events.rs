@@ -18,6 +18,11 @@ pub struct SpawnRobot {
 }
 
 #[derive(Clone, Event)]
+pub struct DespawnRobot {
+    pub handle: Handle<UrdfAsset>,
+}
+
+#[derive(Clone, Event)]
 pub struct RobotSpawned {
     pub handle: Handle<UrdfAsset>,
 }
@@ -123,72 +128,70 @@ pub(crate) fn handle_spawn_robot(
                 commands.spawn(())
             };
 
-            ec
-                .insert((
-                    URDFRobot {
-                        handle: event.handle.clone(),
-                        rapier_handles: rapier_handles,
-                    },
-                    Transform::IDENTITY.with_rotation(Quat::from_rotation_x(std::f32::consts::PI)),
-                    InheritedVisibility::VISIBLE,
-                ))
-                .with_children(|children| {
-                    for (index, geom, _inertia_pose, _collider) in geoms {
-                        if geom.is_none() {
-                            continue;
-                        }
-                        let mesh_3d: Mesh3d = match geom.unwrap() {
-                            urdf_rs::Geometry::Box { size } => Mesh3d(meshes.add(Cuboid::new(
-                                size[0] as f32 * 2.0,
-                                size[2] as f32 * 2.0,
-                                size[1] as f32 * 2.0,
-                            ))),
-                            urdf_rs::Geometry::Cylinder { .. } => todo!(),
-                            urdf_rs::Geometry::Capsule { .. } => todo!(),
-                            urdf_rs::Geometry::Sphere { radius } => {
-                                Mesh3d(meshes.add(Sphere::new(radius as f32)))
-                            }
-                            urdf_rs::Geometry::Mesh { filename, .. } => {
-                                let base_path = event.mesh_dir.as_str();
-                                let model_path = Path::new(base_path).join(filename);
-                                let model_path = model_path.to_str().unwrap();
-
-                                Mesh3d(asset_server.load(model_path))
-                            }
-                        };
-
-                        let rapier_link = urdf.urdf_robot.links[index].clone();
-                        let rapier_pos = rapier_link.body.position();
-                        let rapier_rot = rapier_pos.rotation;
-
-                        let quat_fix = Quat::from_rotation_z(std::f32::consts::PI);
-                        let bevy_quat = quat_fix
-                            * Quat::from_array([
-                                rapier_rot.i,
-                                rapier_rot.j,
-                                rapier_rot.k,
-                                rapier_rot.w,
-                            ]);
-
-                        let rapier_vec = Vec3::new(
-                            rapier_pos.translation.x,
-                            rapier_pos.translation.y,
-                            rapier_pos.translation.z,
-                        );
-                        let bevy_vec = quat_fix.mul_vec3(rapier_vec);
-
-                        let transform =
-                            Transform::from_translation(bevy_vec).with_rotation(bevy_quat);
-
-                        children.spawn((
-                            mesh_3d,
-                            MeshMaterial3d(materials.add(Color::srgb(0.3, 0.4, 0.3))),
-                            UrdfRobotRigidBodyHandle(body_handles[index]),
-                            RapierContextEntityLink(rapier_context_simulation_entity),
-                            transform,
-                        ));
+            ec.insert((
+                URDFRobot {
+                    handle: event.handle.clone(),
+                    rapier_handles: rapier_handles,
+                },
+                Transform::IDENTITY.with_rotation(Quat::from_rotation_x(std::f32::consts::PI)),
+                InheritedVisibility::VISIBLE,
+            ))
+            .with_children(|children| {
+                for (index, geom, _inertia_pose, _collider) in geoms {
+                    if geom.is_none() {
+                        continue;
                     }
-                });
+                    let mesh_3d: Mesh3d = match geom.unwrap() {
+                        urdf_rs::Geometry::Box { size } => Mesh3d(meshes.add(Cuboid::new(
+                            size[0] as f32 * 2.0,
+                            size[2] as f32 * 2.0,
+                            size[1] as f32 * 2.0,
+                        ))),
+                        urdf_rs::Geometry::Cylinder { .. } => todo!(),
+                        urdf_rs::Geometry::Capsule { .. } => todo!(),
+                        urdf_rs::Geometry::Sphere { radius } => {
+                            Mesh3d(meshes.add(Sphere::new(radius as f32)))
+                        }
+                        urdf_rs::Geometry::Mesh { filename, .. } => {
+                            let base_path = event.mesh_dir.as_str();
+                            let model_path = Path::new(base_path).join(filename);
+                            let model_path = model_path.to_str().unwrap();
+
+                            Mesh3d(asset_server.load(model_path))
+                        }
+                    };
+
+                    let rapier_link = urdf.urdf_robot.links[index].clone();
+                    let rapier_pos = rapier_link.body.position();
+                    let rapier_rot = rapier_pos.rotation;
+
+                    let quat_fix = Quat::from_rotation_z(std::f32::consts::PI);
+                    let bevy_quat = quat_fix
+                        * Quat::from_array([
+                            rapier_rot.i,
+                            rapier_rot.j,
+                            rapier_rot.k,
+                            rapier_rot.w,
+                        ]);
+
+                    let rapier_vec = Vec3::new(
+                        rapier_pos.translation.x,
+                        rapier_pos.translation.y,
+                        rapier_pos.translation.z,
+                    );
+                    let bevy_vec = quat_fix.mul_vec3(rapier_vec);
+
+                    let transform = Transform::from_translation(bevy_vec).with_rotation(bevy_quat);
+
+                    children.spawn((
+                        mesh_3d,
+                        MeshMaterial3d(materials.add(Color::srgb(0.3, 0.4, 0.3))),
+                        UrdfRobotRigidBodyHandle(body_handles[index]),
+                        RapierContextEntityLink(rapier_context_simulation_entity),
+                        transform,
+                    ));
+                }
+            });
 
             ew_robot_spawned.send(RobotSpawned {
                 handle: event.handle.clone(),
@@ -199,6 +202,60 @@ pub(crate) fn handle_spawn_robot(
                 mesh_dir: event.mesh_dir.clone(),
                 parent_entity: event.parent_entity.clone(),
             });
+        }
+    }
+}
+
+pub(crate) fn handle_despawn_robot(
+    mut commands: Commands,
+    urdf_assets: Res<Assets<UrdfAsset>>,
+    mut q_rapier_context: Query<(
+        Entity,
+        &mut RapierContextSimulation,
+        &mut RapierRigidBodySet,
+        &mut RapierContextColliders,
+        &mut RapierContextJoints,
+    )>,
+    q_urdf_robots: Query<(Entity, &URDFRobot)>,
+    q_urdf_rigid_body_handles: Query<(Entity, &Parent, &UrdfRobotRigidBodyHandle)>,
+    mut er_spawn_robot: EventReader<DespawnRobot>,
+) {
+    for event in er_spawn_robot.read() {
+        let robot_handle = event.handle.clone();
+        if let Some(_) = urdf_assets.get(robot_handle.id()) {
+            for (
+                _entity,
+                mut simulation,
+                mut rigid_body_set,
+                mut collider_set,
+                mut rapier_context_joints,
+            ) in q_rapier_context.iter_mut()
+            {
+                for (entity, parent, urdf_rigid_body_handle) in q_urdf_rigid_body_handles.iter() {
+                    if let Ok((_, parent_urdf_robot)) = q_urdf_robots.get(parent.get()) {
+                        if parent_urdf_robot.handle != event.handle {
+                            continue;
+                        }
+
+                        let mut impulse_joints = rapier_context_joints.impulse_joints.clone();
+                        let mut multibody_joints = rapier_context_joints.multibody_joints.clone();
+
+                        rigid_body_set.bodies.remove(
+                            urdf_rigid_body_handle.0.clone(),
+                            &mut simulation.islands,
+                            &mut collider_set.colliders,
+                            &mut impulse_joints,
+                            &mut multibody_joints,
+                            true,
+                        );
+
+                        rapier_context_joints.multibody_joints = multibody_joints;
+                        rapier_context_joints.impulse_joints = impulse_joints;
+                    }
+
+                    commands.entity(entity).despawn();
+                }
+            }
         }
     }
 }

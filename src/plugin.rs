@@ -5,9 +5,10 @@ use urdf_rs::{Geometry, Pose};
 
 use crate::{
     events::{
-        handle_control_motors, handle_load_robot, handle_spawn_robot, handle_wait_robot_loaded,
-        ControlMotors, LoadRobot, RobotLoaded, RobotSpawned, SensorsRead, SpawnRobot, URDFRobot,
-        UrdfRobotRigidBodyHandle, WaitRobotLoaded,
+        handle_control_motors, handle_despawn_robot, handle_load_robot, handle_spawn_robot,
+        handle_wait_robot_loaded, ControlMotors, DespawnRobot, LoadRobot, RobotLoaded,
+        RobotSpawned, SensorsRead, SpawnRobot, URDFRobot, UrdfRobotRigidBodyHandle,
+        WaitRobotLoaded,
     },
     urdf_asset_loader::{self, UrdfAsset},
 };
@@ -17,6 +18,7 @@ impl Plugin for UrdfPlugin {
     fn build(&self, app: &mut App) {
         app.init_asset_loader::<urdf_asset_loader::RpyAssetLoader>()
             .add_event::<SpawnRobot>()
+            .add_event::<DespawnRobot>()
             .add_event::<RobotSpawned>()
             .add_event::<WaitRobotLoaded>()
             .add_event::<LoadRobot>()
@@ -31,6 +33,7 @@ impl Plugin for UrdfPlugin {
                 Update,
                 (
                     handle_spawn_robot,
+                    handle_despawn_robot,
                     handle_load_robot,
                     handle_wait_robot_loaded,
                     read_sensors,
@@ -153,8 +156,6 @@ fn adjust_urdf_robot_mean_position(
         if let Some(mean_translation) = mean_translations.get(&handle) {
             let transform_fix = quat_fix.mul_vec3(mean_translation.clone());
             transform.translation -= transform_fix;
-        } else {
-            println!("here");
         }
     }
 }

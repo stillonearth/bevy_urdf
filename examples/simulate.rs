@@ -7,7 +7,7 @@ use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
 use rapier3d::prelude::InteractionGroups;
 
-use bevy_urdf::events::{ControlMotors, LoadRobot, RobotLoaded};
+use bevy_urdf::events::{ControlMotors, DespawnRobot, LoadRobot, RobotLoaded};
 use bevy_urdf::events::{SensorsRead, SpawnRobot};
 use bevy_urdf::plugin::UrdfPlugin;
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
@@ -22,7 +22,7 @@ fn main() {
             StlPlugin,
             NoCameraPlayerPlugin,
             RapierPhysicsPlugin::<NoUserData>::default(),
-            RapierDebugRenderPlugin::default(),
+            // RapierDebugRenderPlugin::default(),
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
         ))
         .init_state::<AppState>()
@@ -31,6 +31,7 @@ fn main() {
             ..default()
         })
         .insert_resource(UrdfRobotHandle(None))
+        .insert_resource(SimulationStepCounter(0))
         .add_systems(Startup, setup)
         .add_systems(Update, (control_motors, print_sensor_values))
         .add_systems(Update, start_simulation.run_if(in_state(AppState::Loading)))
@@ -39,6 +40,9 @@ fn main() {
 
 #[derive(Resource)]
 struct UrdfRobotHandle(Option<Handle<UrdfAsset>>);
+
+#[derive(Resource)]
+struct SimulationStepCounter(usize);
 
 fn start_simulation(
     mut commands: Commands,
@@ -57,9 +61,14 @@ fn start_simulation(
     }
 }
 
-fn print_sensor_values(mut er_read_sensors: EventReader<SensorsRead>) {
+fn print_sensor_values(
+    mut er_read_sensors: EventReader<SensorsRead>,
+    mut simulation_step_counter: ResMut<SimulationStepCounter>,
+    robot_handle: Res<UrdfRobotHandle>,
+    mut er_despawn_robot: EventWriter<DespawnRobot>,
+) {
     for event in er_read_sensors.read() {
-        continue;
+        println!("Step {}", simulation_step_counter.0);
         println!("Robot: {:?}", event.handle.id());
         println!("\transforms:");
         for transform in &event.transforms {
@@ -75,6 +84,18 @@ fn print_sensor_values(mut er_read_sensors: EventReader<SensorsRead>) {
             event.joint_angles.iter().map(|a| a.to_string()).collect();
         println!("\tjoint_angles:");
         println!("\t{}", joint_angles_string.join(" "));
+        println!("------------------------------------");
+
+        if let Some(_) = robot_handle.0.clone() {
+            simulation_step_counter.0 += 1;
+
+            if simulation_step_counter.0 == 300 {
+                println!("despawn robot");
+                er_despawn_robot.send(DespawnRobot {
+                    handle: event.handle.clone(),
+                });
+            }
+        }
     }
 }
 
