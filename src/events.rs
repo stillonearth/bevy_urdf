@@ -184,13 +184,30 @@ pub(crate) fn handle_spawn_robot(
 
                     let transform = Transform::from_translation(bevy_vec).with_rotation(bevy_quat);
 
-                    children.spawn((
+                    let ec = children.spawn((
                         mesh_3d,
                         MeshMaterial3d(materials.add(Color::srgb(0.3, 0.4, 0.3))),
                         UrdfRobotRigidBodyHandle(body_handles[index]),
                         RapierContextEntityLink(rapier_context_simulation_entity),
                         transform,
                     ));
+
+                    let entity_id = ec.id().index();
+
+                    for (_entity, rigid_body_set, mut collider_set, _) in
+                        q_rapier_context.iter_mut()
+                    {
+                        if let Some(rigid_body) = rigid_body_set.bodies.get(body_handles[index]) {
+                            let collider_handles = rigid_body.colliders();
+                            for collider_handle in collider_handles.iter() {
+                                let collider = collider_set
+                                    .colliders
+                                    .get_mut(collider_handle.clone())
+                                    .unwrap();
+                                collider.user_data = entity_id as u128;
+                            }
+                        }
+                    }
                 }
             });
 

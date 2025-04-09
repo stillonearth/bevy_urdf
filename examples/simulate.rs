@@ -159,5 +159,6 @@ fn setup(
         mesh_dir: "assets/robots/flamingo_edu/urdf/".to_string(),
         interaction_groups: None,
         marker: None,
+        translation_shift: Some(Vec3::new(0.0, 5.0, 0.0)),
     });
 }
