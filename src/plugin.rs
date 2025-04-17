@@ -38,7 +38,7 @@ impl Plugin for UrdfPlugin {
                     handle_wait_robot_loaded,
                     read_sensors,
                     handle_control_motors,
-                ),
+                ).chain(),
             )
             .init_asset::<urdf_asset_loader::UrdfAsset>();
     }
