@@ -1,18 +1,51 @@
-use bevy::{prelude::*, utils::hashbrown::HashMap};
+use bevy::{
+    ecs::component::{ComponentHooks, StorageType},
+    prelude::*,
+    utils::hashbrown::HashMap,
+};
 use bevy_rapier3d::prelude::{RapierContextJoints, RapierRigidBodySet};
-use rapier3d::prelude::Collider;
+use rapier3d::prelude::{Collider, MultibodyJointHandle, RigidBodyHandle};
+use rapier3d_urdf::UrdfRobotHandles;
 use urdf_rs::{Geometry, Pose};
 
 use crate::{
     events::{
         handle_control_motors, handle_despawn_robot, handle_load_robot, handle_spawn_robot,
         handle_wait_robot_loaded, ControlMotors, DespawnRobot, LoadRobot, RobotLoaded,
-        RobotSpawned, SensorsRead, SpawnRobot, URDFRobot, UrdfRobotRigidBodyHandle,
-        WaitRobotLoaded,
+        RobotSpawned, SensorsRead, SpawnRobot, WaitRobotLoaded,
     },
     urdf_asset_loader::{self, UrdfAsset},
 };
 pub struct UrdfPlugin;
+
+// Components
+
+// #[derive(Component)]
+pub struct URDFRobot {
+    pub handle: Handle<UrdfAsset>,
+    pub rapier_handles: UrdfRobotHandles<Option<MultibodyJointHandle>>,
+}
+
+impl Component for URDFRobot {
+    const STORAGE_TYPE: StorageType = StorageType::Table;
+
+    fn register_component_hooks(hooks: &mut ComponentHooks) {
+        hooks.on_remove(|mut world, entity, _component| {
+            let entity = world.entity(entity);
+            let component = entity.get::<Self>().unwrap();
+            let handle = component.handle.clone();
+
+            world.commands().queue(move |world: &mut World| {
+                world.send_event(DespawnRobot { handle });
+            })
+        });
+    }
+}
+
+#[derive(Component, Default, Deref)]
+pub struct UrdfRobotRigidBodyHandle(pub RigidBodyHandle);
+
+// Plugin
 
 impl Plugin for UrdfPlugin {
     fn build(&self, app: &mut App) {
@@ -38,7 +71,8 @@ impl Plugin for UrdfPlugin {
                     handle_wait_robot_loaded,
                     read_sensors,
                     handle_control_motors,
-                ).chain(),
+                )
+                    .chain(),
             )
             .init_asset::<urdf_asset_loader::UrdfAsset>();
     }

@@ -6,7 +6,7 @@ use rapier3d::prelude::{InteractionGroups, MultibodyJointHandle, RigidBodyHandle
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobotHandles};
 
 use crate::{
-    plugin::extract_robot_geometry,
+    plugin::{extract_robot_geometry, URDFRobot, UrdfRobotRigidBodyHandle},
     urdf_asset_loader::{RpyAssetLoaderSettings, UrdfAsset},
 };
 
@@ -51,12 +51,6 @@ pub struct LoadRobot {
     pub marker: Option<u32>,
 }
 
-#[derive(Component)]
-pub struct URDFRobot {
-    pub handle: Handle<UrdfAsset>,
-    pub rapier_handles: UrdfRobotHandles<Option<MultibodyJointHandle>>,
-}
-
 #[derive(Event)]
 pub struct SensorsRead {
     pub handle: Handle<UrdfAsset>,
@@ -69,9 +63,6 @@ pub struct ControlMotors {
     pub handle: Handle<UrdfAsset>,
     pub velocities: Vec<f32>,
 }
-
-#[derive(Component, Default, Deref)]
-pub struct UrdfRobotRigidBodyHandle(pub RigidBodyHandle);
 
 pub(crate) fn handle_spawn_robot(
     mut commands: Commands,
@@ -225,7 +216,6 @@ pub(crate) fn handle_spawn_robot(
 }
 
 pub(crate) fn handle_despawn_robot(
-    mut commands: Commands,
     urdf_assets: Res<Assets<UrdfAsset>>,
     mut q_rapier_context: Query<(
         Entity,
@@ -241,6 +231,8 @@ pub(crate) fn handle_despawn_robot(
     for event in er_spawn_robot.read() {
         let robot_handle = event.handle.clone();
         if let Some(_) = urdf_assets.get(robot_handle.id()) {
+            println!("despawning a robot");
+
             for (
                 _entity,
                 mut simulation,
@@ -249,7 +241,7 @@ pub(crate) fn handle_despawn_robot(
                 mut rapier_context_joints,
             ) in q_rapier_context.iter_mut()
             {
-                for (entity, parent, urdf_rigid_body_handle) in q_urdf_rigid_body_handles.iter() {
+                for (_, parent, urdf_rigid_body_handle) in q_urdf_rigid_body_handles.iter() {
                     if let Ok((_, parent_urdf_robot)) = q_urdf_robots.get(parent.get()) {
                         if parent_urdf_robot.handle != event.handle {
                             continue;
@@ -269,9 +261,9 @@ pub(crate) fn handle_despawn_robot(
 
                         rapier_context_joints.multibody_joints = multibody_joints;
                         rapier_context_joints.impulse_joints = impulse_joints;
-                    }
 
-                    commands.entity(entity).despawn();
+                        println!("despawned a robot with handle");
+                    }
                 }
             }
         }
@@ -343,6 +335,10 @@ pub(crate) fn handle_control_motors(
                                     if let Some(_) = revolute.motor() {
                                         if event.velocities.len() < actuator_index {
                                             panic!("not enough control parameters provided");
+                                        }
+
+                                        if event.velocities.len() == 0 {
+                                            continue;
                                         }
 
                                         let target_velocity = event.velocities[actuator_index];
