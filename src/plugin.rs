@@ -30,13 +30,14 @@ impl Component for URDFRobot {
     const STORAGE_TYPE: StorageType = StorageType::Table;
 
     fn register_component_hooks(hooks: &mut ComponentHooks) {
-        hooks.on_remove(|mut world, entity, _component| {
-            let entity = world.entity(entity);
-            let component = entity.get::<Self>().unwrap();
+        hooks.on_remove(|mut world, entity: Entity, _component| {
+            let world_entity = world.entity(entity);
+            let component = world_entity.get::<Self>().unwrap();
             let handle = component.handle.clone();
 
             world.commands().queue(move |world: &mut World| {
                 world.send_event(DespawnRobot { handle });
+                // world.commands().entity(entity).despawn();
             })
         });
     }
@@ -226,8 +227,15 @@ fn read_sensors(
                             let body_2_link = joint_link_handle.link2;
 
                             if let Some(revolute) = joint.as_revolute() {
-                                let rb1 = rapier_rigid_bodies.bodies.get(body_1_link).unwrap();
-                                let rb2 = rapier_rigid_bodies.bodies.get(body_2_link).unwrap();
+                                let rb1 = rapier_rigid_bodies.bodies.get(body_1_link);
+                                let rb2 = rapier_rigid_bodies.bodies.get(body_2_link);
+
+                                if rb1.is_none() || rb2.is_none() {
+                                    continue;
+                                }
+
+                                let rb1 = rb1.unwrap();
+                                let rb2 = rb2.unwrap();
 
                                 let angle = revolute.angle(rb1.rotation(), rb2.rotation());
 

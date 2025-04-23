@@ -2,7 +2,9 @@ use std::path::Path;
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use rapier3d::prelude::{InteractionGroups, MultibodyJointHandle, RigidBodyHandle};
+use rapier3d::prelude::{
+    InteractionGroups, MultibodyJointHandle, MultibodyJointSet, RigidBodyHandle,
+};
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobotHandles};
 
 use crate::{
@@ -216,6 +218,7 @@ pub(crate) fn handle_spawn_robot(
 }
 
 pub(crate) fn handle_despawn_robot(
+    mut commands: Commands,
     urdf_assets: Res<Assets<UrdfAsset>>,
     mut q_rapier_context: Query<(
         Entity,
@@ -230,40 +233,65 @@ pub(crate) fn handle_despawn_robot(
 ) {
     for event in er_spawn_robot.read() {
         let robot_handle = event.handle.clone();
-        if let Some(_) = urdf_assets.get(robot_handle.id()) {
-            println!("despawning a robot");
 
+        if let Some(_) = urdf_assets.get(robot_handle.id()) {
             for (
-                _entity,
+                _,
                 mut simulation,
                 mut rigid_body_set,
                 mut collider_set,
                 mut rapier_context_joints,
             ) in q_rapier_context.iter_mut()
             {
+                // let mut removed_multibody_joints = false;
+
                 for (_, parent, urdf_rigid_body_handle) in q_urdf_rigid_body_handles.iter() {
-                    if let Ok((_, parent_urdf_robot)) = q_urdf_robots.get(parent.get()) {
-                        if parent_urdf_robot.handle != event.handle {
+                    if let Ok((_, urdf_robot)) = q_urdf_robots.get(parent.get()) {
+                        if urdf_robot.handle != event.handle {
                             continue;
                         }
 
                         let mut impulse_joints = rapier_context_joints.impulse_joints.clone();
-                        let mut multibody_joints = rapier_context_joints.multibody_joints.clone();
+                        let mut multibody_joint_set = MultibodyJointSet::new();
+
+                        // bevy_debug_plugin fails if we remove multibody joints
+                        // TODO: investigate
+                        // let mut multibody_joints = rapier_context_joints.multibody_joints.clone();
+                        // println!("1 multibody joins len: {}", multibody_joints.iter().count());
+                        // if !removed_multibody_joints {
+                        //     for joint in urdf_robot.rapier_handles.joints.iter() {
+                        //         if let Some(multibody_joint_handle) = joint.joint {
+                        //             if multibody_joints.get(multibody_joint_handle).is_some() {
+                        //                 // multibody_joints.remove(multibody_joint_handle, true);
+                        //             }
+                        //         }
+                        //     }
+
+                        //     rapier_context_joints.multibody_joints = multibody_joints;
+                        //     println!(
+                        //         "2 multibody joins len: {}",
+                        //         rapier_context_joints.multibody_joints.iter().count()
+                        //     );
+                        //     removed_multibody_joints = true;
+                        // }
 
                         rigid_body_set.bodies.remove(
                             urdf_rigid_body_handle.0.clone(),
                             &mut simulation.islands,
                             &mut collider_set.colliders,
                             &mut impulse_joints,
-                            &mut multibody_joints,
+                            &mut multibody_joint_set,
                             true,
                         );
 
-                        rapier_context_joints.multibody_joints = multibody_joints;
                         rapier_context_joints.impulse_joints = impulse_joints;
-
-                        println!("despawned a robot with handle");
                     }
+                }
+            }
+
+            for (entity, urdf_robot) in q_urdf_robots.iter() {
+                if urdf_robot.handle == event.handle {
+                    commands.entity(entity).despawn_recursive();
                 }
             }
         }
