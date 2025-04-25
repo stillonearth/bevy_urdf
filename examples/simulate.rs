@@ -5,7 +5,6 @@ use bevy_flycam::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
-use rapier3d::prelude::InteractionGroups;
 
 use bevy_urdf::events::{ControlMotors, DespawnRobot, LoadRobot, RobotLoaded};
 use bevy_urdf::events::{SensorsRead, SpawnRobot};
@@ -14,6 +13,10 @@ use bevy_urdf::urdf_asset_loader::UrdfAsset;
 
 use rand::Rng;
 
+/// Simulates a URDF robot with Rapier physics in Bevy.
+///
+/// This example spawns a robot, controls it with random signals for 300 iterations,
+/// then despawns a robot and checks that Rapier structures are clean after despawn.
 fn main() {
     App::new()
         .add_plugins((
@@ -33,7 +36,14 @@ fn main() {
         .insert_resource(UrdfRobotHandle(None))
         .insert_resource(SimulationStepCounter(0))
         .add_systems(Startup, setup)
-        .add_systems(Update, (control_motors, print_sensor_values))
+        .add_systems(
+            Update,
+            (
+                control_motors,
+                robot_lifecycle,
+                check_rapier_state.after(robot_lifecycle),
+            ),
+        )
         .add_systems(Update, start_simulation.run_if(in_state(AppState::Loading)))
         .run();
 }
@@ -61,7 +71,41 @@ fn start_simulation(
     }
 }
 
-fn print_sensor_values(
+fn check_rapier_state(
+    q_rapier_context: Query<(
+        Entity,
+        &mut RapierContextSimulation,
+        &mut RapierRigidBodySet,
+        &mut RapierContextColliders,
+        &mut RapierContextJoints,
+    )>,
+    simulation_step_counter: Res<SimulationStepCounter>,
+) {
+    if simulation_step_counter.0 == 0
+        || simulation_step_counter.0 == 100
+        || simulation_step_counter.0 == 300
+    {
+        println!("----");
+        println!("step {}", simulation_step_counter.0);
+        for (_, _simulation, rigid_body_set, colliders, joints) in q_rapier_context.iter() {
+            let rbl = rigid_body_set.bodies.len();
+            let cl = colliders.colliders.len();
+            let mbjl = joints.multibody_joints.iter().count();
+            let ijl = joints.impulse_joints.len();
+
+            println!("rigid bodies: {}", rbl);
+            println!("colliders: {}", cl);
+            println!("multibody joints: {}", mbjl);
+            println!("impulse joints: {}", ijl);
+        }
+    }
+
+    if simulation_step_counter.0 == 300 {
+        std::process::exit(0x0100);
+    }
+}
+
+fn robot_lifecycle(
     mut er_read_sensors: EventReader<SensorsRead>,
     mut simulation_step_counter: ResMut<SimulationStepCounter>,
     robot_handle: Res<UrdfRobotHandle>,
@@ -90,7 +134,6 @@ fn print_sensor_values(
             simulation_step_counter.0 += 1;
 
             if simulation_step_counter.0 == 300 {
-                println!("despawn robot");
                 er_despawn_robot.send(DespawnRobot {
                     handle: event.handle.clone(),
                 });
@@ -153,7 +196,6 @@ fn setup(
     ));
 
     // load robot
-
     ew_load_robot.send(LoadRobot {
         urdf_path: "robots/flamingo_edu/urdf/Edu_v4.urdf".to_string(),
         mesh_dir: "assets/robots/flamingo_edu/urdf/".to_string(),
