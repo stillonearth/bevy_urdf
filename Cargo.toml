@@ -1,6 +1,6 @@
 [package]
 name = "bevy_urdf"
-version = "0.1.6"
+version = "0.2.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Import robots from URDF files and run simulation with rapier."
@@ -9,14 +9,19 @@ repository = "https://github.com/stillonearth/bevy_urdf"
 
 [dependencies]
 anyhow = "1.0"
-bevy = { version = "0.15", default-features = false, features = ["bevy_asset"] }
-rapier3d-urdf = { version = "0.4.0", features = ["stl"] }
-rapier3d = "0.23"
-bevy_rapier3d = { version = "0.29", features = [
+bevy = { version = "0.16", default-features = false, features = ["bevy_asset"] }
+rapier3d-urdf = { version = "0.5.0", features = ["stl"] }
+rapier3d = { version = "0.24", features = ["serde-serialize"] }
+# bevy_rapier3d = { version = "0.29", features = [
+#     "simd-stable",
+#     "serde-serialize",
+# ] }
+bevy_rapier3d = { git = "https://github.com/mnmaita/bevy_rapier.git", branch = "mnmaita/bevy-0.16", features = [
     "simd-stable",
     "serde-serialize",
 ] }
-bevy_stl = "0.15"
+# bevy_stl = "0.15"
+bevy_stl = { git = "https://github.com/stillonearth/bevy_stl.git" }
 urdf-rs = "0.9"
 thiserror = "2.0"
 serde = { version = "1", features = ["derive"] }
@@ -24,7 +29,7 @@ serde_json = "1"
 rand = "0.9"
 
 [dev-dependencies]
-bevy = { version = "0.15", default-features = false, features = [
+bevy = { version = "0.16", default-features = false, features = [
     "bevy_asset",
     "bevy_core_pipeline",
     "bevy_pbr",
@@ -34,5 +39,5 @@ bevy = { version = "0.15", default-features = false, features = [
     "tonemapping_luts",
     "x11",
 ] }
-bevy_flycam = "0.15.0"
-bevy-inspector-egui = "0.30"
+# bevy_flycam = "0.15.0"
+bevy-inspector-egui = "0.31"

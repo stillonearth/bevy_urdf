@@ -1,7 +1,8 @@
+use std::collections::HashMap;
+
 use bevy::{
-    ecs::component::{ComponentHooks, StorageType},
+    // ecs::component::{ComponentHooks, StorageType},
     prelude::*,
-    utils::hashbrown::HashMap,
 };
 use bevy_rapier3d::prelude::{RapierContextJoints, RapierRigidBodySet};
 use rapier3d::prelude::{Collider, MultibodyJointHandle, RigidBodyHandle};
@@ -20,28 +21,28 @@ pub struct UrdfPlugin;
 
 // Components
 
-// #[derive(Component)]
+#[derive(Component)]
 pub struct URDFRobot {
     pub handle: Handle<UrdfAsset>,
     pub rapier_handles: UrdfRobotHandles<Option<MultibodyJointHandle>>,
 }
 
-impl Component for URDFRobot {
-    const STORAGE_TYPE: StorageType = StorageType::Table;
+// impl Component for URDFRobot {
+//     const STORAGE_TYPE: StorageType = StorageType::Table;
 
-    fn register_component_hooks(hooks: &mut ComponentHooks) {
-        hooks.on_remove(|mut world, entity: Entity, _component| {
-            let world_entity = world.entity(entity);
-            let component = world_entity.get::<Self>().unwrap();
-            let handle = component.handle.clone();
+//     fn register_component_hooks(hooks: &mut ComponentHooks) {
+//         hooks.on_remove(|mut world, entity: Entity, _component| {
+//             let world_entity = world.entity(entity);
+//             let component = world_entity.get::<Self>().unwrap();
+//             let handle = component.handle.clone();
 
-            world.commands().queue(move |world: &mut World| {
-                world.send_event(DespawnRobot { handle });
-                world.commands().entity(entity).despawn_recursive();
-            })
-        });
-    }
-}
+//             world.commands().queue(move |world: &mut World| {
+//                 world.send_event(DespawnRobot { handle });
+//                 world.commands().entity(entity).despawn_recursive();
+//             })
+//         });
+//     }
+// }
 
 #[derive(Component, Default, Deref)]
 pub struct UrdfRobotRigidBodyHandle(pub RigidBodyHandle);
@@ -135,16 +136,16 @@ fn sync_robot_geometry(
 
 /// move parent entity of robot to the ceenter of robot's parts, and adjust robot's parts positions accordingly
 fn adjust_urdf_robot_mean_position(
-    mut q_rapier_robot_bodies: Query<(Entity, &UrdfRobotRigidBodyHandle, &mut Transform, &Parent)>,
+    mut q_rapier_robot_bodies: Query<(Entity, &UrdfRobotRigidBodyHandle, &mut Transform, &ChildOf)>,
     mut q_urdf_robots: Query<
         (Entity, &mut Transform, &URDFRobot),
         Without<UrdfRobotRigidBodyHandle>,
     >,
 ) {
     let mut robot_parts: HashMap<Handle<UrdfAsset>, Vec<Transform>> = HashMap::new();
-    for (_, _, transform, parent) in q_rapier_robot_bodies.iter() {
+    for (_, _, transform, child_od) in q_rapier_robot_bodies.iter() {
         let urdf_robot_result = q_urdf_robots
-            .get(parent.get())
+            .get(child_od.parent())
             .map(|(_, _, urdf)| urdf.handle.clone());
 
         if urdf_robot_result.is_ok() {
@@ -171,7 +172,7 @@ fn adjust_urdf_robot_mean_position(
 
         mean_translations
             .entry(urdf_handle.clone())
-            .insert(mean_translation);
+            .or_insert(mean_translation);
     }
 
     // set urdf_robots translation to mean transform
@@ -182,8 +183,8 @@ fn adjust_urdf_robot_mean_position(
     }
 
     // subtract mean translation from each URDF asset
-    for (_, _, mut transform, parent) in q_rapier_robot_bodies.iter_mut() {
-        let parent = q_urdf_robots.get(parent.get());
+    for (_, _, mut transform, child_of) in q_rapier_robot_bodies.iter_mut() {
+        let parent = q_urdf_robots.get(child_of.parent());
         if parent.is_err() {
             continue;
         }
@@ -197,7 +198,7 @@ fn adjust_urdf_robot_mean_position(
 
 fn read_sensors(
     q_urdf_robots: Query<(Entity, &URDFRobot)>,
-    q_urdf_rigid_bodies: Query<(Entity, &Parent, &Transform, &UrdfRobotRigidBodyHandle)>,
+    q_urdf_rigid_bodies: Query<(Entity, &ChildOf, &Transform, &UrdfRobotRigidBodyHandle)>,
     mut ew_sensors_read: EventWriter<SensorsRead>,
     q_rapier_joints: Query<(&RapierContextJoints, &RapierRigidBodySet)>,
 ) {
@@ -205,8 +206,8 @@ fn read_sensors(
     let mut joint_angles: HashMap<Handle<UrdfAsset>, Vec<f32>> = HashMap::new();
 
     for (parent_entity, urdf_robot) in &mut q_urdf_robots.iter() {
-        for (_, parent, transform, _) in q_urdf_rigid_bodies.iter() {
-            if parent_entity.index() == parent.get().index() {
+        for (_, child_of, transform, _) in q_urdf_rigid_bodies.iter() {
+            if parent_entity.index() == child_of.parent().index() {
                 readings_hashmap
                     .entry(urdf_robot.handle.clone())
                     .or_insert_with(Vec::new)
@@ -252,7 +253,7 @@ fn read_sensors(
     }
 
     for (key, transforms) in readings_hashmap.iter() {
-        ew_sensors_read.send(SensorsRead {
+        ew_sensors_read.write(SensorsRead {
             transforms: transforms.clone(),
             handle: key.clone(),
             joint_angles: joint_angles.entry(key.clone()).or_default().clone(),

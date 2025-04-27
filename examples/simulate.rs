@@ -1,7 +1,8 @@
 use bevy::{
     color::palettes::css::WHITE, input::common_conditions::input_toggle_active, prelude::*,
 };
-use bevy_flycam::*;
+use bevy_inspector_egui::bevy_egui::EguiPlugin;
+// use bevy_flycam::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
@@ -23,16 +24,19 @@ fn main() {
             DefaultPlugins,
             UrdfPlugin,
             StlPlugin,
-            NoCameraPlayerPlugin,
+            // NoCameraPlayerPlugin,
             RapierPhysicsPlugin::<NoUserData>::default(),
             // RapierDebugRenderPlugin::default(),
+            EguiPlugin {
+                enable_multipass_for_primary_context: true,
+            },
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
         ))
         .init_state::<AppState>()
-        .insert_resource(MovementSettings {
-            speed: 1.0,
-            ..default()
-        })
+        // .insert_resource(MovementSettings {
+        //     speed: 1.0,
+        //     ..default()
+        // })
         .insert_resource(UrdfRobotHandle(None))
         .insert_resource(SimulationStepCounter(0))
         .add_systems(Startup, setup)
@@ -61,7 +65,7 @@ fn start_simulation(
     mut state: ResMut<NextState<AppState>>,
 ) {
     for event in er_robot_loaded.read() {
-        ew_spawn_robot.send(SpawnRobot {
+        ew_spawn_robot.write(SpawnRobot {
             handle: event.handle.clone(),
             mesh_dir: event.mesh_dir.clone(),
             parent_entity: None,
@@ -134,7 +138,7 @@ fn robot_lifecycle(
             simulation_step_counter.0 += 1;
 
             if simulation_step_counter.0 == 300 {
-                er_despawn_robot.send(DespawnRobot {
+                er_despawn_robot.write(DespawnRobot {
                     handle: event.handle.clone(),
                 });
             }
@@ -154,7 +158,7 @@ fn control_motors(
             velocities.push(rng.random_range(-5.0..5.0));
         }
 
-        ew_control_motors.send(ControlMotors { handle, velocities });
+        ew_control_motors.write(ControlMotors { handle, velocities });
     }
 }
 
@@ -176,14 +180,12 @@ fn setup(
     commands.insert_resource(AmbientLight {
         color: WHITE.into(),
         brightness: 300.0,
+        ..default()
     });
 
     commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_xyz(3.0, 3.0, 3.0).looking_at(Vec3::ZERO, Vec3::Y),
-            ..default()
-        },
-        FlyCam,
+        Camera3d::default(),
+        // FlyCam
     ));
 
     // ground

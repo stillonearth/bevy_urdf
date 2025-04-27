@@ -203,11 +203,11 @@ pub(crate) fn handle_spawn_robot(
                 }
             });
 
-            ew_robot_spawned.send(RobotSpawned {
+            ew_robot_spawned.write(RobotSpawned {
                 handle: event.handle.clone(),
             });
         } else {
-            ew_wait_robot_loaded.send(WaitRobotLoaded {
+            ew_wait_robot_loaded.write(WaitRobotLoaded {
                 handle: event.handle.clone(),
                 mesh_dir: event.mesh_dir.clone(),
                 parent_entity: event.parent_entity.clone(),
@@ -256,7 +256,7 @@ pub(crate) fn handle_despawn_robot(
                     );
                 }
 
-                commands.entity(entity).despawn_recursive();
+                commands.entity(entity).despawn();
             }
 
             rapier_context_joints.impulse_joints = impulse_joints;
@@ -283,7 +283,7 @@ pub(crate) fn handle_load_robot(
                 }
             });
 
-        ew_robot_loaded.send(RobotLoaded {
+        ew_robot_loaded.write(RobotLoaded {
             handle: robot_handle,
             mesh_dir: event.mesh_dir.clone().replace("assets/", ""),
             marker: event.marker,
@@ -295,7 +295,7 @@ pub(crate) fn handle_wait_robot_loaded(
     mut ew_spawn_robot: EventWriter<SpawnRobot>,
 ) {
     for event in er_wait_robot_loaded.read() {
-        ew_spawn_robot.send(SpawnRobot {
+        ew_spawn_robot.write(SpawnRobot {
             handle: event.handle.clone(),
             mesh_dir: event.mesh_dir.clone(),
             parent_entity: event.parent_entity,
