@@ -20,8 +20,7 @@ bevy_rapier3d = { git = "https://github.com/mnmaita/bevy_rapier.git", branch = "
     "simd-stable",
     "serde-serialize",
 ] }
-# bevy_stl = "0.15"
-bevy_stl = { git = "https://github.com/stillonearth/bevy_stl.git" }
+bevy_stl = "0.16"
 urdf-rs = "0.9"
 thiserror = "2.0"
 serde = { version = "1", features = ["derive"] }
