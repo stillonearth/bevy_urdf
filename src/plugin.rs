@@ -37,7 +37,9 @@ impl Component for URDFRobot {
 
             world.commands().queue(move |world: &mut World| {
                 world.send_event(DespawnRobot { handle });
-                world.commands().entity(entity).despawn_recursive();
+                if let Some(entity) = world.commands().get_entity(entity) {
+                    entity.despawn_recursive();
+                }
             })
         });
     }

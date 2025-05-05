@@ -256,7 +256,9 @@ pub(crate) fn handle_despawn_robot(
                     );
                 }
 
-                commands.entity(entity).despawn_recursive();
+                if let Some(entity) = commands.get_entity(entity) {
+                    entity.despawn_recursive();
+                }
             }
 
             rapier_context_joints.impulse_joints = impulse_joints;
