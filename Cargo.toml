@@ -12,7 +12,7 @@ anyhow = "1.0"
 bevy = { version = "0.16", default-features = false, features = ["bevy_asset"] }
 rapier3d-urdf = { version = "0.6.0", features = ["stl"] }
 rapier3d = { version = "0.25", features = ["serde-serialize"] }
-bevy_rapier3d = { git = "https://github.com/dimforge/bevy_rapier.git", rev = "07e1c52", features = [
+bevy_rapier3d = { version="0.30", features = [
     "simd-stable",
     "serde-serialize",
 ] }
