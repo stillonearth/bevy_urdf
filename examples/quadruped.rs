@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use bevy::{
     color::palettes::css::WHITE, input::common_conditions::input_toggle_active, prelude::*,
 };

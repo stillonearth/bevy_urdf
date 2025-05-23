@@ -6,8 +6,9 @@ use rapier3d::prelude::{InteractionGroups, MultibodyJointHandle, RigidBodyHandle
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobotHandles};
 
 use crate::{
-    plugin::{extract_robot_geometry, URDFRobot, UrdfRobotRigidBodyHandle},
+    plugin::{extract_robot_geometry, URDFRobot, URDFRobotRigidBodyHandle},
     urdf_asset_loader::{RpyAssetLoaderSettings, UrdfAsset},
+    VisualPositionShift,
 };
 
 #[derive(Clone, Event)]
@@ -132,7 +133,7 @@ pub(crate) fn handle_spawn_robot(
                 InheritedVisibility::VISIBLE,
             ))
             .with_children(|children| {
-                for (index, geom, _inertia_pose, _collider) in geoms {
+                for (index, geom, _, visual_pose, _collider) in geoms {
                     if geom.is_none() {
                         continue;
                     }
@@ -153,15 +154,24 @@ pub(crate) fn handle_spawn_robot(
                             let model_path = Path::new(base_path).join(filename);
                             let model_path = model_path.to_str().unwrap();
 
-                            println!("{:?}", model_path);
-
                             Mesh3d(asset_server.load(model_path))
                         }
                     };
 
                     let rapier_link = urdf.urdf_robot.links[index].clone();
                     let rapier_pos = rapier_link.body.position();
+                    let mut visual_position_shift = Vec3::ZERO;
+
+                    // if let Some(visual_pose) = visual_pose {
+                    //     visual_position_shift = Vec3::new(
+                    //         visual_pose.xyz.0[0] as f32,
+                    //         visual_pose.xyz.0[2] as f32,
+                    //         visual_pose.xyz.0[1] as f32,
+                    //     );
+                    // }
                     let rapier_rot = rapier_pos.rotation;
+
+                    println!("rapier rotation: {}", rapier_rot.quaternion());
 
                     let quat_fix = Quat::from_rotation_z(std::f32::consts::PI);
                     let bevy_quat = quat_fix
@@ -179,14 +189,16 @@ pub(crate) fn handle_spawn_robot(
                     );
                     let bevy_vec = quat_fix.mul_vec3(rapier_vec);
 
-                    let transform = Transform::from_translation(bevy_vec).with_rotation(bevy_quat);
+                    let transform = Transform::from_translation(bevy_vec + visual_position_shift)
+                        .with_rotation(bevy_quat);
 
                     let ec = children.spawn((
                         mesh_3d,
                         MeshMaterial3d(materials.add(Color::srgb(0.3, 0.4, 0.3))),
-                        UrdfRobotRigidBodyHandle(body_handles[index]),
+                        URDFRobotRigidBodyHandle(body_handles[index]),
                         RapierContextEntityLink(rapier_context_simulation_entity),
-                        transform,
+                        VisualPositionShift(visual_position_shift),
+                        transform.clone(),
                     ));
 
                     let entity_id = ec.id().index();
