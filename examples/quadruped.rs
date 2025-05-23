@@ -1,8 +1,8 @@
 use bevy::{
     color::palettes::css::WHITE, input::common_conditions::input_toggle_active, prelude::*,
 };
+use bevy_flycam::prelude::*;
 use bevy_inspector_egui::bevy_egui::EguiPlugin;
-// use bevy_flycam::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
@@ -24,19 +24,27 @@ fn main() {
             DefaultPlugins,
             UrdfPlugin,
             StlPlugin,
-            // NoCameraPlayerPlugin,
+            FlyCameraPlugin {
+                spawn_camera: true,
+                grab_cursor_on_startup: true,
+            },
             RapierPhysicsPlugin::<NoUserData>::default(),
-            // RapierDebugRenderPlugin::default(),
             EguiPlugin {
                 enable_multipass_for_primary_context: true,
             },
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
         ))
         .init_state::<AppState>()
-        // .insert_resource(MovementSettings {
-        //     speed: 1.0,
-        //     ..default()
-        // })
+        .insert_resource(MovementSettings {
+            move_speed: Vec3::ONE * 3.0,
+            ..default()
+        })
+        .insert_resource(MouseSettings {
+            invert_horizontal: false,
+            invert_vertical: false,
+            mouse_sensitivity: 0.00012,
+            lock_cursor_to_middle: false,
+        })
         .insert_resource(UrdfRobotHandle(None))
         .insert_resource(SimulationStepCounter(0))
         .add_systems(Startup, setup)
@@ -104,7 +112,7 @@ fn check_rapier_state(
         }
     }
 
-    if simulation_step_counter.0 == 300 {
+    if simulation_step_counter.0 == 5000 {
         std::process::exit(0x0100);
     }
 }
@@ -137,7 +145,7 @@ fn robot_lifecycle(
         if let Some(_) = robot_handle.0.clone() {
             simulation_step_counter.0 += 1;
 
-            if simulation_step_counter.0 == 300 {
+            if simulation_step_counter.0 == 5000 {
                 er_despawn_robot.write(DespawnRobot {
                     handle: event.handle.clone(),
                 });
@@ -183,11 +191,6 @@ fn setup(
         ..default()
     });
 
-    commands.spawn((
-        Camera3d::default(),
-        // FlyCam
-    ));
-
     // ground
     commands.spawn((
         Mesh3d(meshes.add(Cuboid::new(180., 0.1, 180.))),
@@ -204,5 +207,7 @@ fn setup(
         interaction_groups: None,
         marker: None,
         translation_shift: Some(Vec3::new(0.0, 5.0, 0.0)),
+        create_colliders_from_visual_shapes: true,
+        create_colliders_from_collision_shapes: false,
     });
 }

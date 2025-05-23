@@ -24,6 +24,8 @@ pub struct RpyAssetLoaderSettings {
     pub mesh_dir: Option<String>,
     pub interaction_groups: Option<InteractionGroups>,
     pub translation_shift: Option<Vec3>,
+    pub create_colliders_from_visual_shapes: bool,
+    pub create_colliders_from_collision_shapes: bool,
 }
 
 #[non_exhaustive]
@@ -49,7 +51,8 @@ impl AssetLoader for RpyAssetLoader {
         let content = std::str::from_utf8(&bytes).unwrap();
 
         let mut isometry: nalgebra::Isometry<f32, nalgebra::Unit<nalgebra::Quaternion<f32>>, 3> =
-            Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2);
+            Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2)
+                * Isometry::rotation(Vector::y() * std::f32::consts::FRAC_PI_2 * 2.0);
         if let Some(translaction_shift) = settings.translation_shift {
             isometry.append_translation_mut(&Translation3::new(
                 translaction_shift.x,

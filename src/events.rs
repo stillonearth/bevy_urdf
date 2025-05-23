@@ -47,6 +47,8 @@ pub struct LoadRobot {
     pub mesh_dir: String,
     pub interaction_groups: Option<InteractionGroups>,
     pub translation_shift: Option<Vec3>,
+    pub create_colliders_from_visual_shapes: bool,
+    pub create_colliders_from_collision_shapes: bool,
     /// this field can be used to keep causality of `LoadRobot -> RobotLoaded`` event chain
     pub marker: Option<u32>,
 }
@@ -134,6 +136,7 @@ pub(crate) fn handle_spawn_robot(
                     if geom.is_none() {
                         continue;
                     }
+
                     let mesh_3d: Mesh3d = match geom.unwrap() {
                         urdf_rs::Geometry::Box { size } => Mesh3d(meshes.add(Cuboid::new(
                             size[0] as f32 * 2.0,
@@ -149,6 +152,8 @@ pub(crate) fn handle_spawn_robot(
                             let base_path = event.mesh_dir.as_str();
                             let model_path = Path::new(base_path).join(filename);
                             let model_path = model_path.to_str().unwrap();
+
+                            println!("{:?}", model_path);
 
                             Mesh3d(asset_server.load(model_path))
                         }
@@ -271,7 +276,10 @@ pub(crate) fn handle_load_robot(
     mut ew_robot_loaded: EventWriter<RobotLoaded>,
 ) {
     for event in er_load_robot.read() {
-        let interaction_groups = event.interaction_groups.clone();
+        let interaction_groups: Option<InteractionGroups> = event.interaction_groups.clone();
+        let create_colliders_from_collision_shapes =
+            event.create_colliders_from_collision_shapes.clone();
+        let create_colliders_from_visual_shapes = event.create_colliders_from_visual_shapes.clone();
         let translation_shift = event.translation_shift.clone();
         let mesh_dir = Some(event.clone().mesh_dir);
         let robot_handle: Handle<UrdfAsset> =
@@ -280,6 +288,8 @@ pub(crate) fn handle_load_robot(
                     mesh_dir: mesh_dir.clone(),
                     translation_shift,
                     interaction_groups,
+                    create_colliders_from_collision_shapes,
+                    create_colliders_from_visual_shapes,
                 }
             });
 

@@ -84,6 +84,7 @@ pub fn extract_robot_geometry(
     robot: &UrdfAsset,
 ) -> Vec<(usize, Option<Geometry>, Pose, Option<Collider>)> {
     let mut result: Vec<(usize, Option<Geometry>, Pose, Option<Collider>)> = Vec::new();
+
     for (i, link) in robot.robot.links.iter().enumerate() {
         let colliders = robot.urdf_robot.links[i].colliders.clone();
         let collider = if colliders.len() == 1 {
@@ -160,7 +161,7 @@ fn adjust_urdf_robot_mean_position(
         Quat::from_rotation_z(std::f32::consts::PI) * Quat::from_rotation_y(std::f32::consts::PI);
 
     let mut mean_translations: HashMap<Handle<UrdfAsset>, Vec3> = HashMap::new();
-    // Calculate mean transfrom for each URDF asset
+    // calculate mean transfrom for each URDF asset
     for (urdf_handle, transforms) in robot_parts.iter() {
         let mut mean_translation = Vec3::ZERO;
         for transform in transforms {

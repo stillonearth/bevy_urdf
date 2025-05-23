@@ -10,13 +10,14 @@ repository = "https://github.com/stillonearth/bevy_urdf"
 [dependencies]
 anyhow = "1.0"
 bevy = { version = "0.16", default-features = false, features = ["bevy_asset"] }
-rapier3d-urdf = { version = "0.6.0", features = ["stl"] }
+rapier3d-urdf = { version = "0.6.0", features = ["stl", "wavefront"] }
 rapier3d = { version = "0.25", features = ["serde-serialize"] }
 bevy_rapier3d = { version="0.30", features = [
     "simd-stable",
     "serde-serialize",
 ] }
 bevy_stl = "0.16"
+bevy_obj = "0.16"
 urdf-rs = "0.9"
 thiserror = "2.0"
 serde = { version = "1", features = ["derive"] }
@@ -34,5 +35,5 @@ bevy = { version = "0.16", default-features = false, features = [
     "tonemapping_luts",
     "x11",
 ] }
-# bevy_flycam = "0.15.0"
+bevy_flycam = { git = "https://github.com/kSDOT/bevy_flycam.git", rev="a6f36a"}
 bevy-inspector-egui = "0.31"
