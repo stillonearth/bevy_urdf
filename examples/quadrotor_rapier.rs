@@ -41,8 +41,6 @@ pub fn main() {
     );
     let drone_handle = robot_handle.links[0].body;
 
-    // return;
-    /* Run the game loop, stepping the simulation once per frame. */
     for i in 0..999 {
         physics_pipeline.step(
             &gravity,
@@ -64,7 +62,7 @@ pub fn main() {
         let drone_center_body = bodies.get_mut(drone_handle).unwrap();
         drone_dynamics(
             drone_center_body,
-            [force * 1.1, force * 1.1, force * 1.1, force * 1.1],
+            [force * 1.1, force * 1.0, force * 1.1, force * 1.0],
         );
     }
 }
@@ -72,8 +70,8 @@ pub fn main() {
 fn drone_dynamics(drone_center_body: &mut RigidBody, thrusts: [f32; 4]) {
     let torque_to_thrust_ratio = 7.94e-12 / 3.16e-10;
 
-    drone_center_body.reset_forces(false);
-    drone_center_body.reset_torques(false);
+    drone_center_body.reset_forces(true);
+    drone_center_body.reset_torques(true);
 
     let isometry = Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2);
 
