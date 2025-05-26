@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::error::Error;
 
 use bevy::{
     color::palettes::css::WHITE, input::common_conditions::input_toggle_active, prelude::*,
@@ -17,35 +16,6 @@ use bevy_urdf::urdf_asset_loader::UrdfAsset;
 
 use bevy_urdf::quadrotor::{ControlThrusts, PropellerDirection, URDFDrone};
 
-#[derive(Resource)]
-pub struct MotorCommands(Vec<Vec<f32>>);
-
-fn read_motor_commands() -> Result<Vec<Vec<f32>>, Box<dyn Error>> {
-    // Build the CSV reader and iterate over each record.
-    let rdr = csv::ReaderBuilder::new()
-        .delimiter(b',')
-        .from_path("assets/motors.csv");
-
-    let mut recs: Vec<Vec<f32>> = Vec::new();
-    for result in rdr.unwrap().records() {
-        let record = result?;
-
-        let mut rec: Vec<f32> = Vec::new();
-
-        rec.push(record[0].parse::<f32>().unwrap());
-        rec.push(record[1].parse::<f32>().unwrap());
-        rec.push(record[2].parse::<f32>().unwrap());
-        rec.push(record[3].parse::<f32>().unwrap());
-
-        recs.push(rec);
-    }
-    Ok(recs)
-}
-
-/// Simulates a URDF robot with Rapier physics in Bevy.
-///
-/// This example spawns a robot, controls it with random signals for 300 iterations,
-/// then despawns a robot and checks that Rapier structures are clean after despawn.
 fn main() {
     App::new()
         .add_plugins((
@@ -64,7 +34,6 @@ fn main() {
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
         ))
         .init_state::<AppState>()
-        .insert_resource(MotorCommands(read_motor_commands().unwrap()))
         .insert_resource(MovementSettings {
             move_speed: Vec3::ONE * 3.0,
             ..default()
@@ -77,7 +46,6 @@ fn main() {
         })
         .insert_resource(ClearColor(Color::linear_rgb(1.0, 1.0, 1.0)))
         .insert_resource(UrdfRobotHandle(None))
-        .insert_resource(SimulationStepCounter(0))
         .add_systems(Startup, setup)
         .add_systems(Update, (control_thrusts))
         .add_systems(Update, start_simulation.run_if(in_state(AppState::Loading)))
@@ -86,9 +54,6 @@ fn main() {
 
 #[derive(Resource)]
 struct UrdfRobotHandle(Option<Handle<UrdfAsset>>);
-
-#[derive(Resource)]
-struct SimulationStepCounter(usize);
 
 #[derive(Component)]
 struct Crazyflie;
@@ -114,20 +79,12 @@ fn start_simulation(
 fn control_thrusts(
     robot_handle: Res<UrdfRobotHandle>,
     mut ew_control_motors: EventWriter<ControlThrusts>,
-    mut simulation_step_counter: ResMut<SimulationStepCounter>,
-    motor_commands: Res<MotorCommands>,
 ) {
     if let Some(handle) = robot_handle.0.clone() {
-        let step = simulation_step_counter.0 as usize;
-        if motor_commands.0.len() <= step {
-            std::process::exit(0x0100);
-        }
-        let motors = &motor_commands.0[step];
-
-        let t1 = (motors[0] * 0.0 + 0.027 * 9.81 / 4.) * -1.0;
-        let t2 = (motors[1] * 0.0 + 0.027 * 9.81 / 4.) * 1.0;
-        let t3 = (motors[2] * 0.0 + 0.027 * 9.81 / 4.) * 1.0;
-        let t4 = (motors[3] * 0.0 + 0.027 * 9.81 / 4.) * 1.0;
+        let t1 = 0.027 * 9.81 / 4. * 1.0;
+        let t2 = 0.027 * 9.81 / 4. * 1.0;
+        let t3 = 0.027 * 9.81 / 4. * 1.2;
+        let t4 = 0.027 * 9.81 / 4. * 1.2;
 
         // println!("total force {}", t1 + t2 + t3 + t4);
 
@@ -135,8 +92,6 @@ fn control_thrusts(
             handle,
             thrusts: vec![t1, t3, t4, t2],
         });
-
-        simulation_step_counter.0 += 1;
     }
 }
 

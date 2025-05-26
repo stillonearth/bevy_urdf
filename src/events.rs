@@ -171,7 +171,7 @@ pub(crate) fn handle_spawn_robot(
                     // }
                     let rapier_rot = rapier_pos.rotation;
 
-                    println!("rapier rotation: {}", rapier_rot.quaternion());
+                    // println!("rapier rotation: {}", rapier_rot.quaternion());
 
                     let quat_fix = Quat::from_rotation_z(std::f32::consts::PI);
                     let bevy_quat = quat_fix

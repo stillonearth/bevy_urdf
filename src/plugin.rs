@@ -161,10 +161,6 @@ fn sync_robot_geometry(
                     rapier_pos.translation.z,
                 );
 
-                if j == 0 {
-                    println!("{} {} {}", rapier_vec.x, rapier_vec.y, rapier_vec.z);
-                }
-
                 let bevy_vec = quat_fix.mul_vec3(rapier_vec);
                 *transform = Transform::from_translation(bevy_vec).with_rotation(bevy_quat);
             }

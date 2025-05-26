@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use nalgebra::vector;
+use rapier3d::math::{Isometry, Vector};
 
 use crate::{urdf_asset_loader::UrdfAsset, URDFRobot};
 
@@ -32,6 +33,10 @@ pub(crate) fn handle_control_thrusts(
     let p3 = vector![-0.28, 0.0, 0.28];
     let p4 = vector![0.28, 0.0, 0.28];
 
+    let torque_to_thrust_ratio = 7.94e-12 / 3.16e-10;
+
+    // let null_rotation = Rotation::
+
     for event in er_control_thrusts.read() {
         let f1 = vector![0.0, event.thrusts[0], 0.0];
         let f2 = vector![0.0, event.thrusts[1], 0.0];
@@ -50,42 +55,7 @@ pub(crate) fn handle_control_thrusts(
                 if let Some(drone_center_body) =
                     rapier_rigid_bodies.bodies.get_mut(drone_center_body_handle)
                 {
-                    drone_center_body.reset_forces(false);
-                    drone_center_body.reset_torques(false);
-
-                    let translation = drone_center_body.translation();
-                    println!("translation {:?}", translation);
-
-                    let rotation = *drone_center_body.rotation();
-
-                    let f1_eff = rotation * vector![0.0, event.thrusts[0], 0.0];
-                    let f2_eff = rotation * vector![0.0, event.thrusts[1], 0.0];
-                    let f3_eff = rotation * vector![0.0, event.thrusts[2], 0.0];
-                    let f4_eff = rotation * vector![0.0, event.thrusts[3], 0.0];
-
-                    let sum_force = f1_eff + f2_eff + f3_eff + f4_eff;
-                    let sum_force = vector![sum_force[0], sum_force[2], sum_force[1]];
-
-                    drone_center_body.add_force(sum_force, true);
-
-                    let t1 = rotation * p1.cross(&f1);
-                    let t1 = vector![t1[0], t1[2], t1[1]];
-
-                    drone_center_body.add_torque(t1, true);
-
-                    let t2 = rotation * p2.cross(&f2);
-                    let t2 = vector![t2[0], t2[2], t2[1]];
-                    drone_center_body.add_torque(t2, true);
-
-                    let t3 = rotation * p3.cross(&f3);
-                    let t3 = vector![t3[0], t3[2], t3[1]];
-                    drone_center_body.add_torque(t3, true);
-
-                    let t4 = rotation * p4.cross(&f4);
-                    let t4 = vector![t4[0], t4[2], t4[1]];
-                    drone_center_body.add_torque(t4, true);
-
-                    println!("t1 {} t2 {} t3 {} t4 {}", t1, t2, t3, t4);
+                    // DO DRONE DYNAMICS HERE
                 }
             }
         }
