@@ -82,27 +82,27 @@ fn drone_dynamics(drone_center_body: &mut RigidBody, thrusts: [f32; 4]) {
 
     let f = vector![0.0, 1.0, 0.0];
 
-    let f1 = rotation * f * thrusts[0];
-    let f2 = rotation * f * thrusts[1];
-    let f3 = rotation * f * thrusts[2];
-    let f4 = rotation * f * thrusts[3];
+    let f1 = f * thrusts[0];
+    let f2 = f * thrusts[1];
+    let f3 = f * thrusts[2];
+    let f4 = f * thrusts[3];
 
-    drone_center_body.add_force(f1 + f2 + f3 + f4, true);
+    drone_center_body.add_force(rotation * (f1 + f2 + f3 + f4), true);
 
     let mut t1 = (rotation * rotor_1_position).cross(&f1);
-    t1 += (rotation * vector![0.0, 1.0, 0.0]) * (torque_to_thrust_ratio * thrusts[0]);
+    t1 += (rotation * f) * (torque_to_thrust_ratio * thrusts[0]);
     drone_center_body.add_torque(t1, true);
 
     let mut t2 = (rotation * rotor_2_position).cross(&f2);
-    t2 -= (rotation * vector![0.0, 1.0, 0.0]) * (torque_to_thrust_ratio * thrusts[1]);
+    t2 -= (rotation * f) * (torque_to_thrust_ratio * thrusts[1]);
     drone_center_body.add_torque(t2, true);
 
     let mut t3 = (rotation * rotor_3_position).cross(&f3);
-    t3 += (rotation * vector![0.0, 1.0, 0.0]) * (torque_to_thrust_ratio * thrusts[2]);
+    t3 += (rotation * f) * (torque_to_thrust_ratio * thrusts[2]);
     drone_center_body.add_torque(t3, true);
 
     let mut t4 = (rotation * rotor_4_position).cross(&f4);
-    t4 -= (rotation * vector![0.0, 1.0, 0.0]) * (torque_to_thrust_ratio * thrusts[3]);
+    t4 -= (rotation * f) * (torque_to_thrust_ratio * thrusts[3]);
     drone_center_body.add_torque(t4, true);
 
     let position = drone_center_body.position().translation.clone();
