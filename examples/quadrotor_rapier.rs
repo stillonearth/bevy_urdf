@@ -60,8 +60,12 @@ pub fn main() {
             &event_handler,
         );
 
+        let force = 0.027 * 9.81 / 4. * 1.2;
         let drone_center_body = bodies.get_mut(drone_handle).unwrap();
-        drone_dynamics(drone_center_body, [0.09, 0.09, 0.09, 0.09]);
+        drone_dynamics(
+            drone_center_body,
+            [force * 1.1, force * 1.1, force * 1.1, force * 1.1],
+        );
     }
 }
 
