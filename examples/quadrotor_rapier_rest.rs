@@ -142,7 +142,8 @@ impl PhysicsWorld {
         drone_center_body.reset_torques(true);
 
         let isometry = Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2);
-        let rotation = isometry.rotation.inverse() * drone_center_body.rotation().clone();
+        let inverse = isometry.rotation.inverse();
+        let rotation = inverse * drone_center_body.rotation().clone();
 
         let rotor_1_position = vector![0.28, 0.0, -0.28];
         let rotor_2_position = vector![-0.28, 0.0, -0.28];
@@ -157,21 +158,38 @@ impl PhysicsWorld {
 
         drone_center_body.add_force(rotation * (f1 + f2 + f3 + f4), true);
 
-        let t1_thrust = (rotation * rotor_1_position).cross(&f1);
+        let t1_thrust = (rotor_1_position).cross(&(rotation * f1));
         let t1_torque = torque_to_thrust_ratio * (rotation * f) * thrusts[0];
-        drone_center_body.add_torque(t1_thrust - t1_torque, true);
+        // drone_center_body.add_torque(t1_thrust - t1_torque, true);
 
-        let t2_thrust = (rotation * rotor_2_position).cross(&f2);
+        let t2_thrust = (rotor_2_position).cross(&(rotation * f2));
         let t2_torque = torque_to_thrust_ratio * (rotation * f) * thrusts[1];
-        drone_center_body.add_torque(t2_thrust + t2_torque, true);
+        // drone_center_body.add_torque(t2_thrust - t2_torque, true);
 
-        let t3_thrust = (rotation * rotor_3_position).cross(&f3);
+        let t3_thrust = (rotor_3_position).cross(&(rotation * f3));
         let t3_torque = torque_to_thrust_ratio * (rotation * f) * thrusts[2];
-        drone_center_body.add_torque(t3_thrust - t3_torque, true);
+        // drone_center_body.add_torque(t3_thrust + t3_torque, true);
 
-        let t4_thrust = (rotation * rotor_4_position).cross(&f4);
+        let t4_thrust = (rotor_4_position).cross(&(rotation * f4));
         let t4_torque = torque_to_thrust_ratio * (rotation * f) * thrusts[3];
-        drone_center_body.add_torque(t4_thrust + t4_torque, true);
+        // drone_center_body.add_torque(t4_thrust + t4_torque, true);
+
+        let t_thrust = inverse * (t1_thrust + t2_thrust + t3_thrust + t4_thrust);
+        let t_torque = inverse * ((t1_torque - t4_torque) - (t2_torque - t3_torque));
+
+        println!(
+            "~~~thrust {}{}{}{}~~~",
+            t1_thrust, t2_thrust, t3_thrust, t4_thrust
+        );
+
+        println!(
+            "~~~torque {}{}{}{}~~~",
+            t1_torque, t2_torque, t3_torque, t4_torque
+        );
+
+        println!("t_thrust:{} t_torque: {}", t_thrust, t_torque);
+
+        drone_center_body.add_torque(t_thrust + t_torque, true);
     }
 
     fn get_drone_state(&self) -> DroneState {
