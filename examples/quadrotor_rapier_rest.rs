@@ -14,7 +14,7 @@ struct MotorInput {
 struct DroneState {
     position: [f32; 3],
     velocity: [f32; 3],
-    rotation: [f32; 4], // quaternion [x, y, z, w]
+    rotation: [f32; 4],
     angular_velocity: [f32; 3],
     timestamp: f64,
 }
@@ -45,7 +45,7 @@ struct PhysicsWorld {
 
 impl PhysicsWorld {
     fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let gravity = vector![0.0, -9.81, 0.0];
+        let gravity = vector![0.0, 0.0, -9.81];
         let mut integration_parameters = IntegrationParameters::default();
         let physics_pipeline = PhysicsPipeline::new();
         let island_manager = IslandManager::new();
@@ -59,15 +59,13 @@ impl PhysicsWorld {
         let mut bodies = RigidBodySet::new();
 
         // Set step size
-        integration_parameters.dt = 1.0 / 100.0;
+        // integration_parameters.dt = 1.0 / 00.0;
 
         // Load robot
         let options = UrdfLoaderOptions {
             create_colliders_from_visual_shapes: false,
             create_colliders_from_collision_shapes: true,
             make_roots_fixed: false,
-            // Z-up to Y-up.
-            shift: Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2),
             ..Default::default()
         };
 
@@ -141,26 +139,20 @@ impl PhysicsWorld {
         drone_center_body.reset_forces(true);
         drone_center_body.reset_torques(true);
 
-        let isometry = Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2);
-        let inverse = isometry.rotation.inverse();
-        let rotation = inverse * drone_center_body.rotation().clone();
+        let rotation = drone_center_body.rotation().clone();
 
-        let rotor_1_position = vector![0.28, 0.0, -0.28];
-        let rotor_2_position = vector![-0.28, 0.0, -0.28];
-        let rotor_3_position = vector![-0.28, 0.0, 0.28];
-        let rotor_4_position = vector![0.28, 0.0, 0.28];
+        let rotor_1_position = vector![0.28, -0.28, 0.0];
+        let rotor_2_position = vector![-0.28, -0.28, 0.0];
+        let rotor_3_position = vector![-0.28, 0.28, 0.0];
+        let rotor_4_position = vector![0.28, 0.28, 0.0];
 
-        let f = vector![0.0, 1.0, 0.0];
+        let f = vector![0.0, 0.0, 1.0];
         let f1 = f * thrusts[0];
         let f2 = f * thrusts[1];
         let f3 = f * thrusts[2];
         let f4 = f * thrusts[3];
 
         let full_force = rotation * (f1 + f2 + f3 + f4);
-        // full_force.x *= -1.0;
-
-        println!("full_force: {:?}", full_force);
-        println!("thrust: {:?}", thrusts);
 
         drone_center_body.add_force(full_force, true);
 
@@ -176,31 +168,24 @@ impl PhysicsWorld {
         let t4_thrust = (rotor_4_position).cross(&(f4));
         let t4_torque = torque_to_thrust_ratio * (f4);
 
-        let mut t_thrust = (t1_thrust + t2_thrust + t3_thrust + t4_thrust);
-        (t_thrust.z, t_thrust.y) = (t_thrust.y, thrusts.z);
-        let t_torque = ((t1_torque - t4_torque) - (t2_torque - t3_torque));
+        let t_thrust = rotation * (t1_thrust + t2_thrust + t3_thrust + t4_thrust);
+        let t_torque = rotation * ((t1_torque - t4_torque) - (t2_torque - t3_torque));
 
-        println!("~~~{} {}~~~", t_thrust, t_torque);
-        println!("<<{}{}{}{}>>", t1_thrust, t2_thrust, t3_thrust, t4_thrust);
-
-        // drone_center_body.add_torque(t_thrust + t_torque, true);
-        drone_center_body.add_torque(t_thrust, true);
+        drone_center_body.add_torque(t_thrust + t_torque, true);
     }
 
     fn get_drone_state(&self) -> DroneState {
         if let Some(drone_body) = self.bodies.get(self.drone_handle) {
-            let isometry = Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2);
-            let inverse = isometry.rotation.inverse();
             let position = drone_body.position().translation.vector;
             let velocity = drone_body.linvel();
-            let rotation = inverse * drone_body.rotation();
-            let angular_velocity = inverse * drone_body.angvel();
+            let rotation = drone_body.rotation();
+            let angular_velocity = drone_body.angvel();
 
             DroneState {
-                position: [position.x, position.z, position.y],
-                velocity: [velocity.x, velocity.z, velocity.y],
-                rotation: [rotation.w, rotation.i, rotation.k, rotation.j],
-                angular_velocity: [angular_velocity.x, angular_velocity.z, angular_velocity.y],
+                position: [position.x, position.y, position.z],
+                velocity: [velocity.x, velocity.y, velocity.z],
+                rotation: [rotation.w, rotation.i, rotation.j, rotation.k],
+                angular_velocity: [angular_velocity.x, angular_velocity.y, angular_velocity.z],
                 timestamp: self.current_time,
             }
         } else {
