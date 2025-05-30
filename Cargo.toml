@@ -43,3 +43,5 @@ bevy-inspector-egui = "0.31"
 actix-web = "4.4"
 tokio = { version = "1.0", features = ["full"] }
 env_logger = "0.10"
+avian3d = "0.3"
+bevy_rl = "0.16"

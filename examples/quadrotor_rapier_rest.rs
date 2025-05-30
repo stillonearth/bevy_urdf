@@ -136,15 +136,15 @@ impl PhysicsWorld {
     fn drone_dynamics(&self, drone_center_body: &mut RigidBody, thrusts: [f32; 4]) {
         let torque_to_thrust_ratio = 7.94e-12 / 3.16e-10;
 
-        drone_center_body.reset_forces(true);
-        drone_center_body.reset_torques(true);
+        drone_center_body.reset_forces(false);
+        drone_center_body.reset_torques(false);
 
         let rotation = drone_center_body.rotation().clone();
 
-        let rotor_1_position = vector![0.28, -0.28, 0.0];
-        let rotor_2_position = vector![-0.28, -0.28, 0.0];
-        let rotor_3_position = vector![-0.28, 0.28, 0.0];
-        let rotor_4_position = vector![0.28, 0.28, 0.0];
+        let rotor_1_position = vector![0.028, -0.028, 0.0];
+        let rotor_2_position = vector![-0.028, -0.028, 0.0];
+        let rotor_3_position = vector![-0.028, 0.028, 0.0];
+        let rotor_4_position = vector![0.028, 0.028, 0.0];
 
         let f = vector![0.0, 0.0, 1.0];
         let f1 = f * thrusts[0];
@@ -154,7 +154,7 @@ impl PhysicsWorld {
 
         let full_force = rotation * (f1 + f2 + f3 + f4);
 
-        drone_center_body.add_force(full_force, true);
+        drone_center_body.add_force(full_force, false);
 
         let t1_thrust = (rotor_1_position).cross(&(f1));
         let t1_torque = torque_to_thrust_ratio * (f1);
@@ -171,7 +171,7 @@ impl PhysicsWorld {
         let t_thrust = rotation * (t1_thrust + t2_thrust + t3_thrust + t4_thrust);
         let t_torque = rotation * ((t1_torque - t4_torque) - (t2_torque - t3_torque));
 
-        drone_center_body.add_torque(t_thrust + t_torque, true);
+        drone_center_body.add_torque(t_thrust - t_torque, true);
     }
 
     fn get_drone_state(&self) -> DroneState {
@@ -282,13 +282,6 @@ async fn get_simulation_state(simulation: web::Data<SimulationState>) -> Result<
     }
 }
 
-async fn health_check() -> Result<HttpResponse> {
-    Ok(HttpResponse::Ok().json(serde_json::json!({
-        "status": "healthy",
-        "service": "drone-physics-api"
-    })))
-}
-
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init();
@@ -301,7 +294,6 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(simulation.clone())
             .wrap(Logger::default())
-            .route("/health", web::get().to(health_check))
             .route("/simulate", web::post().to(simulate_step))
             .route("/reset", web::post().to(reset_simulation))
             .route("/state", web::get().to(get_simulation_state))
