@@ -61,11 +61,15 @@ impl PhysicsWorld {
         // Set step size
         // integration_parameters.dt = 1.0 / 00.0;
 
+        let isometry: nalgebra::Isometry<f32, nalgebra::Unit<nalgebra::Quaternion<f32>>, 3> =
+            Isometry::translation(0.0, 0.0, 0.1);
+
         // Load robot
         let options = UrdfLoaderOptions {
             create_colliders_from_visual_shapes: false,
             create_colliders_from_collision_shapes: true,
             make_roots_fixed: false,
+            shift: isometry,
             ..Default::default()
         };
 
@@ -177,8 +181,8 @@ impl PhysicsWorld {
     fn get_drone_state(&self) -> DroneState {
         if let Some(drone_body) = self.bodies.get(self.drone_handle) {
             let position = drone_body.position().translation.vector;
-            let velocity = drone_body.linvel();
             let rotation = drone_body.rotation();
+            let velocity = drone_body.linvel();
             let angular_velocity = drone_body.angvel();
 
             DroneState {
