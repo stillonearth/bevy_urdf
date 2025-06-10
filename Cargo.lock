@@ -1793,6 +1793,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.12",
  "tokio",
+ "uav",
  "uom",
  "urdf-rs",
 ]
@@ -2889,6 +2890,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fast_ode"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99fbfb9cd36c2163d346363866f9ffeaf8674b27410e49eaebd85fa766546033"
+dependencies = [
+ "float_next_after",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2927,6 +2937,12 @@ checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
 dependencies = [
  "num-traits",
 ]
+
+[[package]]
+name = "float_next_after"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8bf7cc16383c4b8d58b9905a8509f02926ce3058053c056376248d958c9df1e8"
 
 [[package]]
 name = "fnv"
@@ -6579,6 +6595,15 @@ name = "typenum"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
+
+[[package]]
+name = "uav"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a349266bee6c6a52d76f8ea591e3a48d152543d79a12c838969e60ac56ce359"
+dependencies = [
+ "fast_ode",
+]
 
 [[package]]
 name = "unicase"
