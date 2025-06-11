@@ -1,6 +1,6 @@
 [package]
 name = "bevy_urdf"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Import robots from URDF files and run simulation with rapier."
@@ -46,4 +46,3 @@ bevy-inspector-egui = "0.31"
 actix-web = "4.4"
 tokio = { version = "1.0", features = ["full"] }
 env_logger = "0.10"
-bevy_rl = "0.16"

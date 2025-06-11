@@ -1,8 +1,11 @@
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::{
-    RapierContextColliders, RapierContextJoints, RapierContextSimulation, RapierRigidBodySet,
+use bevy_rapier3d::{
+    plugin::RapierConfiguration,
+    prelude::{
+        RapierContextColliders, RapierContextJoints, RapierContextSimulation, RapierRigidBodySet,
+    },
 };
 use nalgebra::{vector, Isometry3, Quaternion, Rotation, Rotation3, UnitQuaternion, Vector3};
 use quick_xml::events::Event;
@@ -42,10 +45,6 @@ pub struct DroneAerodynamicsProps {
     pub dw_coeff_2: f32,
     pub dw_coeff_3: f32,
 }
-
-//   <properties arm="0.0397" kf="3.16e-10" km="7.94e-12" thrust2weight="2.25" max_speed_kmh="30"
-//     gnd_eff_coeff="11.36859" prop_radius="2.31348e-2" drag_coeff_xy="9.1785e-7"
-//     drag_coeff_z="10.311e-7" dw_coeff_1="2267.18" dw_coeff_2=".16" dw_coeff_3="-.11" />
 
 #[derive(Event)]
 pub struct ControlThrusts {
@@ -171,6 +170,7 @@ pub(crate) fn simulate_drone(
     mut q_drones: Query<(Entity, &URDFRobot, &mut DroneDescriptor)>,
     mut q_rapier_context: Query<(
         Entity,
+        &mut RapierConfiguration,
         &mut RapierContextSimulation,
         &mut RapierRigidBodySet,
         &mut RapierContextColliders,
@@ -178,9 +178,18 @@ pub(crate) fn simulate_drone(
     )>,
 ) {
     let start_time = 0.0;
-    let end_time = time.elapsed_secs() as f64;
+    let end_time = time.delta_secs_f64() as f64;
 
-    for (_, _, mut rigid_bodies, _, _) in q_rapier_context.iter_mut() {
+    for (_, rapier_configuration, _, mut rigid_bodies, _, _) in q_rapier_context.iter_mut() {
+        if !rapier_configuration.physics_pipeline_active {
+            continue;
+        }
+
+        println!(
+            "physics_pipeline_active : {:?} ",
+            rapier_configuration.physics_pipeline_active
+        );
+
         for (_, urdf_robot, mut drone) in q_drones.iter_mut() {
             let consts = uav::Consts {
                 g: 9.81, // todo: extract from rapier
