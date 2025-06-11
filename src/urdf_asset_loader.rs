@@ -17,6 +17,7 @@ pub struct RpyAssetLoader;
 pub struct UrdfAsset {
     pub robot: Robot,
     pub urdf_robot: UrdfRobot,
+    pub xml_string: String,
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
@@ -105,6 +106,10 @@ impl AssetLoader for RpyAssetLoader {
             urdf_robot.links = robot_links;
         }
 
-        Ok(UrdfAsset { robot, urdf_robot })
+        Ok(UrdfAsset {
+            robot,
+            urdf_robot,
+            xml_string: String::from(content),
+        })
     }
 }

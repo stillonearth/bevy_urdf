@@ -88,8 +88,6 @@ impl PhysicsWorld {
                 println!("{:?}", new_state);
 
                 self.current_time += 1. / 60.;
-                println!("time: {}", self.current_time);
-                println!("---");
                 self.state = new_state;
                 return self.convert_uav_state(self.state);
             }

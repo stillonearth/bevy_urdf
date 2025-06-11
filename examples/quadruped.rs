@@ -9,7 +9,7 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
 
-use bevy_urdf::events::{ControlMotors, DespawnRobot, LoadRobot, RobotLoaded};
+use bevy_urdf::events::{ControlMotors, DespawnRobot, LoadRobot, RobotLoaded, RobotType};
 use bevy_urdf::events::{SensorsRead, SpawnRobot};
 use bevy_urdf::plugin::UrdfPlugin;
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
@@ -79,6 +79,7 @@ fn start_simulation(
             handle: event.handle.clone(),
             mesh_dir: event.mesh_dir.clone(),
             parent_entity: None,
+            robot_type: RobotType::NotDrone,
         });
         state.set(AppState::Simulation);
         commands.insert_resource(UrdfRobotHandle(Some(event.handle.clone())));

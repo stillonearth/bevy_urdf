@@ -590,38 +590,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "avian3d"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8ba10c23fee3d432f3c6cf8d036e269d952b8840c1ca4fa6a021ab926786dc4"
-dependencies = [
- "avian_derive",
- "bevy",
- "bevy_heavy",
- "bevy_math",
- "bevy_transform_interpolation",
- "bitflags 2.9.0",
- "derive_more 1.0.0",
- "itertools 0.13.0",
- "nalgebra",
- "parry3d 0.17.6",
- "parry3d-f64",
- "thread_local",
-]
-
-[[package]]
-name = "avian_derive"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12b257f601a1535e0d4a7a7796f535e3a13de62fd422b16dff7c14d27f0d4048"
-dependencies = [
- "proc-macro-error2",
- "proc-macro2",
- "quote",
- "syn 2.0.100",
-]
-
-[[package]]
 name = "avif-serialize"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1113,16 +1081,6 @@ dependencies = [
  "smallvec",
  "thiserror 2.0.12",
  "tracing",
-]
-
-[[package]]
-name = "bevy_heavy"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34ccc861fea2ff58c67f4df119512e204050bd7631a3a9c65e1a5e9d162cce28"
-dependencies = [
- "bevy_math",
- "bevy_reflect",
 ]
 
 [[package]]
@@ -1725,15 +1683,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy_transform_interpolation"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72c7c6c4e6a3d5415b3a29a17bd20c17cd0e2f068b96b24e263316d58d5346ea"
-dependencies = [
- "bevy",
-]
-
-[[package]]
 name = "bevy_ui"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1775,7 +1724,6 @@ version = "0.2.0"
 dependencies = [
  "actix-web",
  "anyhow",
- "avian3d",
  "bevy",
  "bevy-inspector-egui",
  "bevy_flycam",
@@ -1786,9 +1734,11 @@ dependencies = [
  "csv",
  "env_logger",
  "nalgebra",
+ "quick-xml 0.37.5",
  "rand 0.9.0",
  "rapier3d",
  "rapier3d-urdf",
+ "roxmltree",
  "serde",
  "serde_json",
  "thiserror 2.0.12",
@@ -4845,33 +4795,6 @@ dependencies = [
 
 [[package]]
 name = "parry3d"
-version = "0.17.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6aeb9659a05b1783fb2e9bc94f48225ae5b40817eb45b62569c0e4dd767a6e51"
-dependencies = [
- "approx",
- "arrayvec",
- "bitflags 2.9.0",
- "downcast-rs 1.2.1",
- "either",
- "ena",
- "log",
- "nalgebra",
- "num-derive",
- "num-traits",
- "ordered-float 4.6.0",
- "rayon",
- "rstar",
- "rustc-hash 2.1.1",
- "simba",
- "slab",
- "smallvec",
- "spade",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "parry3d"
 version = "0.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bec55ce6f725367f8149f750575e79a8879d71b7257c02273259f9375822821f"
@@ -4894,33 +4817,6 @@ dependencies = [
  "slab",
  "spade",
  "thiserror 2.0.12",
-]
-
-[[package]]
-name = "parry3d-f64"
-version = "0.17.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4484c8ad93ff03c0e57aa1a4f3ff5406ab6301a1eb838ef6dea90e94f00a6c7"
-dependencies = [
- "approx",
- "arrayvec",
- "bitflags 2.9.0",
- "downcast-rs 1.2.1",
- "either",
- "ena",
- "log",
- "nalgebra",
- "num-derive",
- "num-traits",
- "ordered-float 4.6.0",
- "rayon",
- "rstar",
- "rustc-hash 2.1.1",
- "simba",
- "slab",
- "smallvec",
- "spade",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -5098,28 +4994,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "proc-macro-error-attr2"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96de42df36bb9bba5542fe9f1a054b8cc87e172759a1868aa05c1f3acc89dfc5"
-dependencies = [
- "proc-macro2",
- "quote",
-]
-
-[[package]]
-name = "proc-macro-error2"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11ec05c52be0a07b08061f7dd003e7d7092e0472bc731b4af7bb1ef876109802"
-dependencies = [
- "proc-macro-error-attr2",
- "proc-macro2",
- "quote",
- "syn 2.0.100",
-]
-
-[[package]]
 name = "proc-macro-hack"
 version = "0.5.20+deprecated"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5180,9 +5054,9 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.37.2"
+version = "0.37.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "165859e9e55f79d67b96c5d96f4e88b6f2695a1972849c15a6a3f5c59fc2c003"
+checksum = "331e97a1af0bf59823e6eadffe373d7b27f485be8748f71471c662c1f269b7fb"
 dependencies = [
  "memchr",
 ]
@@ -5307,7 +5181,7 @@ dependencies = [
  "num-derive",
  "num-traits",
  "ordered-float 5.0.0",
- "parry3d 0.20.2",
+ "parry3d",
  "profiling",
  "rustc-hash 2.1.1",
  "serde",
@@ -6599,8 +6473,6 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 [[package]]
 name = "uav"
 version = "0.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a349266bee6c6a52d76f8ea591e3a48d152543d79a12c838969e60ac56ce359"
 dependencies = [
  "fast_ode",
 ]
@@ -6968,7 +6840,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "896fdafd5d28145fce7958917d69f2fd44469b1d4e861cb5961bcbeebc6d1484"
 dependencies = [
  "proc-macro2",
- "quick-xml 0.37.2",
+ "quick-xml 0.37.5",
  "quote",
 ]
 

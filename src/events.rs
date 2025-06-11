@@ -2,20 +2,31 @@ use std::path::Path;
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use rapier3d::prelude::{InteractionGroups, MultibodyJointHandle, RigidBodyHandle};
+use rapier3d::prelude::{InteractionGroups, MultibodyJointHandle, RigidBodyHandle, RigidBodyType};
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobotHandles};
 
 use crate::{
+    drones::{parse_drone_aerodynamics, DroneDescriptor},
     plugin::{extract_robot_geometry, URDFRobot, URDFRobotRigidBodyHandle},
     urdf_asset_loader::{RpyAssetLoaderSettings, UrdfAsset},
     VisualPositionShift,
 };
+
+#[derive(Clone, PartialEq, PartialOrd)]
+pub enum RobotType {
+    Drone,
+    NotDrone,
+}
+
+#[derive(Component)]
+pub struct Rotor {}
 
 #[derive(Clone, Event)]
 pub struct SpawnRobot {
     pub handle: Handle<UrdfAsset>,
     pub mesh_dir: String,
     pub parent_entity: Option<Entity>,
+    pub robot_type: RobotType,
 }
 
 #[derive(Clone, Event)]
@@ -33,6 +44,7 @@ pub struct WaitRobotLoaded {
     pub handle: Handle<UrdfAsset>,
     pub mesh_dir: String,
     pub parent_entity: Option<Entity>,
+    pub robot_type: RobotType,
 }
 
 #[derive(Clone, Event)]
@@ -91,11 +103,39 @@ pub(crate) fn handle_spawn_robot(
         if let Some(urdf) = urdf_assets.get(robot_handle.id()) {
             let mut maybe_rapier_handles: Option<UrdfRobotHandles<Option<MultibodyJointHandle>>> =
                 None;
+            let mut drone_descriptor = DroneDescriptor { ..default() };
+
             // let mut handles: Option<UrdfRobotHandles<ImpulseJointHandle>> = None;
             for (_entity, mut rigid_body_set, mut collider_set, mut multibidy_joint_set) in
                 q_rapier_context.iter_mut()
             {
                 let urdf_robot = urdf.urdf_robot.clone();
+
+                // do stuff if robot is a copter
+                if event.robot_type == RobotType::Drone {
+                    // try extracting aerodynamics props
+                    if let Ok(aerodynamics_props) = parse_drone_aerodynamics(&urdf.xml_string) {
+                        drone_descriptor.aerodynamics_props = aerodynamics_props;
+                    }
+
+                    for i in 0..urdf.urdf_robot.links.len() {
+                        if i == 0 {
+                            drone_descriptor.mass = urdf.robot.links[i].inertial.mass.value as f32;
+                            drone_descriptor.ixx = urdf.robot.links[i].inertial.inertia.ixx as f32;
+                            drone_descriptor.iyy = urdf.robot.links[i].inertial.inertia.iyy as f32;
+                            drone_descriptor.izz = urdf.robot.links[i].inertial.inertia.izz as f32;
+                        } else {
+                            let prop_origin = urdf.robot.links[i].inertial.origin.xyz;
+                            if prop_origin.0 != [0.0, 0.0, 0.0] {
+                                drone_descriptor.rotor_positions.push(Vec3::new(
+                                    prop_origin.0[0] as f32,
+                                    prop_origin.0[1] as f32,
+                                    prop_origin.0[2] as f32,
+                                ));
+                            }
+                        }
+                    }
+                }
 
                 maybe_rapier_handles = Some(urdf_robot.clone().insert_using_multibody_joints(
                     &mut rigid_body_set.bodies,
@@ -124,16 +164,21 @@ pub(crate) fn handle_spawn_robot(
                 commands.spawn(())
             };
 
+            if event.robot_type == RobotType::Drone {
+                ec.insert(drone_descriptor);
+            }
+
             ec.insert((
                 URDFRobot {
                     handle: event.handle.clone(),
                     rapier_handles: rapier_handles,
+                    robot_type: event.robot_type.clone(),
                 },
                 Transform::IDENTITY.with_rotation(Quat::from_rotation_x(std::f32::consts::PI)),
                 InheritedVisibility::VISIBLE,
             ))
             .with_children(|children| {
-                for (index, geom, _, visual_pose, _collider) in geoms {
+                for (index, geom, _, _visual_pose, _collider) in geoms {
                     if geom.is_none() {
                         continue;
                     }
@@ -160,18 +205,9 @@ pub(crate) fn handle_spawn_robot(
 
                     let rapier_link = urdf.urdf_robot.links[index].clone();
                     let rapier_pos = rapier_link.body.position();
-                    let mut visual_position_shift = Vec3::ZERO;
+                    let visual_position_shift = Vec3::ZERO;
 
-                    // if let Some(visual_pose) = visual_pose {
-                    //     visual_position_shift = Vec3::new(
-                    //         visual_pose.xyz.0[0] as f32,
-                    //         visual_pose.xyz.0[2] as f32,
-                    //         visual_pose.xyz.0[1] as f32,
-                    //     );
-                    // }
                     let rapier_rot = rapier_pos.rotation;
-
-                    // println!("rapier rotation: {}", rapier_rot.quaternion());
 
                     let quat_fix = Quat::from_rotation_z(std::f32::consts::PI);
                     let bevy_quat = quat_fix
@@ -201,12 +237,20 @@ pub(crate) fn handle_spawn_robot(
                         transform.clone(),
                     ));
 
+                    // insert entity id to collider data, otherwise it breaks in debug mode
                     let entity_id = ec.id().index();
-
-                    for (_entity, rigid_body_set, mut collider_set, _) in
+                    for (_entity, mut rigid_body_set, mut collider_set, _) in
                         q_rapier_context.iter_mut()
                     {
-                        if let Some(rigid_body) = rigid_body_set.bodies.get(body_handles[index]) {
+                        if let Some(rigid_body) = rigid_body_set.bodies.get_mut(body_handles[index])
+                        {
+                            // make robot a kinematic body if we're simulating a drone
+                            // assume root body index is 0
+                            if event.robot_type == RobotType::Drone && index == 0 {
+                                rigid_body
+                                    .set_body_type(RigidBodyType::KinematicPositionBased, false);
+                            }
+
                             let collider_handles = rigid_body.colliders();
                             for collider_handle in collider_handles.iter() {
                                 let collider = collider_set
@@ -228,6 +272,7 @@ pub(crate) fn handle_spawn_robot(
                 handle: event.handle.clone(),
                 mesh_dir: event.mesh_dir.clone(),
                 parent_entity: event.parent_entity.clone(),
+                robot_type: event.robot_type.clone(),
             });
         }
     }
@@ -321,6 +366,7 @@ pub(crate) fn handle_wait_robot_loaded(
             handle: event.handle.clone(),
             mesh_dir: event.mesh_dir.clone(),
             parent_entity: event.parent_entity,
+            robot_type: event.robot_type.clone(),
         });
     }
 }

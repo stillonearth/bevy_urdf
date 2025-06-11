@@ -46,7 +46,7 @@ struct PhysicsWorld {
 impl PhysicsWorld {
     fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let gravity = vector![0.0, 0.0, -9.81];
-        let mut integration_parameters = IntegrationParameters::default();
+        let integration_parameters = IntegrationParameters::default();
         let physics_pipeline = PhysicsPipeline::new();
         let island_manager = IslandManager::new();
         let broad_phase = DefaultBroadPhase::new();

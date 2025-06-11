@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use bevy::{
     color::palettes::css::WHITE, input::common_conditions::input_toggle_active, prelude::*,
 };
@@ -9,12 +7,11 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_obj::ObjPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
-use bevy_urdf::events::SpawnRobot;
+use bevy_urdf::drones::ControlThrusts;
 use bevy_urdf::events::{LoadRobot, RobotLoaded};
+use bevy_urdf::events::{RobotType, SpawnRobot};
 use bevy_urdf::plugin::UrdfPlugin;
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
-
-use bevy_urdf::quadrotor::{ControlThrusts, PropellerDirection, URDFDrone};
 
 fn main() {
     App::new()
@@ -24,7 +21,7 @@ fn main() {
             StlPlugin,
             ObjPlugin,
             FlyCameraPlugin {
-                spawn_camera: false,
+                spawn_camera: true,
                 grab_cursor_on_startup: true,
             },
             RapierPhysicsPlugin::<NoUserData>::default(),
@@ -47,7 +44,7 @@ fn main() {
         .insert_resource(ClearColor(Color::linear_rgb(1.0, 1.0, 1.0)))
         .insert_resource(UrdfRobotHandle(None))
         .add_systems(Startup, setup)
-        .add_systems(Update, (control_thrusts))
+        .add_systems(Update, control_thrusts)
         .add_systems(Update, start_simulation.run_if(in_state(AppState::Loading)))
         .run();
 }
@@ -70,6 +67,7 @@ fn start_simulation(
             handle: event.handle.clone(),
             mesh_dir: event.mesh_dir.clone(),
             parent_entity: Some(q_crazflie.iter().last().unwrap().0),
+            robot_type: RobotType::Drone,
         });
         state.set(AppState::Simulation);
         commands.insert_resource(UrdfRobotHandle(Some(event.handle.clone())));
@@ -83,10 +81,8 @@ fn control_thrusts(
     if let Some(handle) = robot_handle.0.clone() {
         let t1 = 0.027 * 9.81 / 4. * 1.0;
         let t2 = 0.027 * 9.81 / 4. * 1.0;
-        let t3 = 0.027 * 9.81 / 4. * 1.2;
-        let t4 = 0.027 * 9.81 / 4. * 1.2;
-
-        // println!("total force {}", t1 + t2 + t3 + t4);
+        let t3 = 0.027 * 9.81 / 4. * 1.0;
+        let t4 = 0.027 * 9.81 / 4. * 1.0;
 
         ew_control_motors.write(ControlThrusts {
             handle,
@@ -116,31 +112,7 @@ fn setup(
         ..default()
     });
 
-    // camera
-    commands.spawn((
-        Camera3d::default(),
-        FlyCam,
-        Transform::from_xyz(0.0, 3.0, 3.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
-
-    let mut drone_definition = URDFDrone {
-        propellers: HashMap::new(),
-    };
-    drone_definition
-        .propellers
-        .insert(1, PropellerDirection::CW);
-    drone_definition
-        .propellers
-        .insert(2, PropellerDirection::CCW);
-    drone_definition
-        .propellers
-        .insert(3, PropellerDirection::CW);
-    drone_definition
-        .propellers
-        .insert(4, PropellerDirection::CCW);
-
-    // crazyflie parent entity
-    commands.spawn((Crazyflie, drone_definition));
+    commands.spawn((Crazyflie));
 
     // ground
     commands.spawn((
@@ -157,8 +129,10 @@ fn setup(
         mesh_dir: "assets/quadrotors/crazyflie/".to_string(),
         interaction_groups: None,
         marker: None,
-        translation_shift: Some(Vec3::new(0.0, 0.02, 0.0)),
+        translation_shift: None,
         create_colliders_from_visual_shapes: false,
         create_colliders_from_collision_shapes: true,
     });
+
+    println!("end setup");
 }

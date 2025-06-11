@@ -7,12 +7,12 @@ use rapier3d_urdf::UrdfRobotHandles;
 use urdf_rs::{Geometry, Pose};
 
 use crate::{
+    drones::{handle_control_thrusts, simulate_drone, ControlThrusts},
     events::{
         handle_control_motors, handle_despawn_robot, handle_load_robot, handle_spawn_robot,
         handle_wait_robot_loaded, ControlMotors, DespawnRobot, LoadRobot, RobotLoaded,
-        RobotSpawned, SensorsRead, SpawnRobot, WaitRobotLoaded,
+        RobotSpawned, RobotType, SensorsRead, SpawnRobot, WaitRobotLoaded,
     },
-    quadrotor::{handle_control_thrusts, ControlThrusts},
     urdf_asset_loader::{self, UrdfAsset},
 };
 pub struct UrdfPlugin;
@@ -23,6 +23,7 @@ pub struct UrdfPlugin;
 pub struct URDFRobot {
     pub handle: Handle<UrdfAsset>,
     pub rapier_handles: UrdfRobotHandles<Option<MultibodyJointHandle>>,
+    pub robot_type: RobotType,
 }
 
 // impl Component for URDFRobot {
@@ -53,29 +54,34 @@ pub struct VisualPositionShift(pub Vec3);
 impl Plugin for UrdfPlugin {
     fn build(&self, app: &mut App) {
         app.init_asset_loader::<urdf_asset_loader::RpyAssetLoader>()
-            .add_event::<SpawnRobot>()
-            .add_event::<DespawnRobot>()
-            .add_event::<RobotSpawned>()
-            .add_event::<WaitRobotLoaded>()
-            .add_event::<LoadRobot>()
-            .add_event::<RobotLoaded>()
-            .add_event::<SensorsRead>()
             .add_event::<ControlMotors>()
             .add_event::<ControlThrusts>()
+            .add_event::<DespawnRobot>()
+            .add_event::<LoadRobot>()
+            .add_event::<RobotLoaded>()
+            .add_event::<RobotSpawned>()
+            .add_event::<SensorsRead>()
+            .add_event::<SpawnRobot>()
+            .add_event::<WaitRobotLoaded>()
             .add_systems(
                 Update,
-                (sync_robot_geometry, adjust_urdf_robot_mean_position).chain(),
+                (
+                    simulate_drone,
+                    sync_robot_geometry,
+                    adjust_urdf_robot_mean_position,
+                )
+                    .chain(),
             )
             .add_systems(
                 Update,
                 (
-                    handle_spawn_robot,
+                    handle_control_motors,
+                    handle_control_thrusts,
                     handle_despawn_robot,
                     handle_load_robot,
+                    handle_spawn_robot,
                     handle_wait_robot_loaded,
-                    handle_control_thrusts,
                     read_sensors,
-                    handle_control_motors,
                 )
                     .chain(),
             )
@@ -147,7 +153,6 @@ fn sync_robot_geometry(
         {
             if let Some(robot_body) = rapier_rigid_body_set.0.bodies.get(body_handle.0) {
                 let rapier_pos = robot_body.position();
-
                 let rapier_rot = rapier_pos.rotation;
 
                 let quat_fix = Quat::from_rotation_z(std::f32::consts::PI)
@@ -194,6 +199,7 @@ fn adjust_urdf_robot_mean_position(
         Quat::from_rotation_z(std::f32::consts::PI) * Quat::from_rotation_y(std::f32::consts::PI);
 
     let mut mean_translations: HashMap<Handle<UrdfAsset>, Vec3> = HashMap::new();
+
     // calculate mean transfrom for each URDF asset
     for (urdf_handle, transforms) in robot_parts.iter() {
         let mut mean_translation = Vec3::ZERO;
