@@ -6472,7 +6472,9 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 
 [[package]]
 name = "uav"
-version = "0.0.1"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2cf57c1aa04c4e758da80143ea4c11eaea85fb424b40594a80ffe90d0705ebd5"
 dependencies = [
  "fast_ode",
 ]
