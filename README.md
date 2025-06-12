@@ -1,73 +1,121 @@
 # bevy_urdf
-<img src="https://github.com/user-attachments/assets/1ec9c5e8-0de1-4f25-a69a-4cfba12cd8ae" width="100">
 
-Import robots from URDF files and run simulation with rapier. Drones are simulated by integrating dynamics model.
+<img src="https://github.com/user-attachments/assets/1ec9c5e8-0de1-4f25-a69a-4cfba12cd8ae" width="100" alt="bevy_urdf logo">
 
-## API 
+A Bevy plugin for importing robots from URDF files and running physics simulations. Ground vehicles use Rapier physics, while drones are simulated using integrated dynamics models.
 
-1. *Add Urdf and Stl plugins to bevy app*
+## Features
 
-```rust
-UrdfPlugin,
-StlPlugin,
-ObjPlugin,
+- Import URDF robot descriptions into Bevy
+- Support for STL and OBJ mesh formats
+- Rapier physics integration for ground vehicles
+- Custom dynamics simulation for drone vehicles
+- Event-driven sensor reading and motor control
+- Multiple robot type support (ground vehicles, quadrupeds, drones)
+
+## Installation
+
+Add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+bevy_urdf = "0.1.0"  # Replace with actual version
 ```
 
-2. *Load robot in your startup systems*
+## Quick Start
+
+### 1. Add Plugins
+
+Add the necessary plugins to your Bevy app:
 
 ```rust
+use bevy::prelude::*;
+use bevy_urdf::{UrdfPlugin, StlPlugin, ObjPlugin};
 
-fn setup(mut ew_load_robot: EventWriter<LoadRobot>,) {
-...
-ew_load_robot.send(LoadRobot {
-    urdf_path: "robots/flamingo_edu/urdf/Edu_v4.urdf".to_string(),
-    mesh_dir: "assets/robots/flamingo_edu/urdf".to_string(),
-});
-...
+fn main() {
+    App::new()
+        .add_plugins(DefaultPlugins)
+        .add_plugins((
+            UrdfPlugin,
+            StlPlugin,
+            ObjPlugin,
+        ))
+        .run();
 }
 ```
 
-3. *Subscribe to loaded event and emit spawn event*
+### 2. Load Robot
+
+Load a robot in your startup systems:
 
 ```rust
+use bevy_urdf::{LoadRobot, RobotLoaded};
+
+fn setup(mut load_robot_events: EventWriter<LoadRobot>) {
+    load_robot_events.send(LoadRobot {
+        urdf_path: "robots/flamingo_edu/urdf/Edu_v4.urdf".to_string(),
+        mesh_dir: "assets/robots/flamingo_edu/urdf".to_string(),
+    });
+}
+```
+
+### 3. Spawn Robot
+
+Subscribe to the loaded event and spawn the robot:
+
+```rust
+use bevy_urdf::{RobotLoaded, SpawnRobot, RobotType};
+
 fn start_simulation(
-    mut er_robot_loaded: EventReader<RobotLoaded>,
-    mut ew_spawn_robot: EventWriter<SpawnRobot>,
-    mut state: ResMut<NextState<AppState>>,
+    mut robot_loaded_events: EventReader<RobotLoaded>,
+    mut spawn_robot_events: EventWriter<SpawnRobot>,
+    mut next_state: ResMut<NextState<AppState>>,
 ) {
-    for event in er_robot_loaded.read() {
-        ew_spawn_robot.send(SpawnRobot {
+    for event in robot_loaded_events.read() {
+        spawn_robot_events.send(SpawnRobot {
             handle: event.handle.clone(),
             mesh_dir: event.mesh_dir.clone(),
             robot_type: RobotType::NotDrone,
         });
-        state.set(AppState::Simulation);
+        next_state.set(AppState::Simulation);
     }
 }
 ```
 
+## API Reference
+
 ### Events
 
-Read sensors and control motors through events:
+The plugin uses an event-driven architecture for robot control and sensor feedback:
 
+#### Sensor Reading
 
 ```rust
-
 #[derive(Event)]
 pub struct SensorsRead {
     pub handle: Handle<UrdfAsset>,
     pub transforms: Vec<Transform>,
     pub joint_angles: Vec<f32>,
 }
+```
 
-// for ground robots / cars
+#### Motor Control (Ground Robots)
+
+For ground-based robots and vehicles:
+
+```rust
 #[derive(Event)]
 pub struct ControlMotors {
     pub handle: Handle<UrdfAsset>,
     pub velocities: Vec<f32>,
 }
+```
 
-// for ground drones
+#### Thrust Control (Drones)
+
+For aerial vehicles and drones:
+
+```rust
 #[derive(Event)]
 pub struct ControlThrusts {
     pub handle: Handle<UrdfAsset>,
@@ -75,15 +123,47 @@ pub struct ControlThrusts {
 }
 ```
 
+### Robot Types
 
-## Limitations
-
-You may need to hand-inspect urdf files to ensure mesh links are relative paths. `package://` and links and gazebo nodes are not supported.
-Drone rotors aren't yet animated.
+- `RobotType::NotDrone` - Ground vehicles, quadrupeds, manipulators
+- `RobotType::Drone` - Aerial vehicles with thrust-based control
 
 ## Examples
 
+Run the included examples to see the plugin in action:
+
 ```bash
-cargo run --example quadrotor --release # drone
-cargo run --example quadruped --release # robot-dog
+# Drone simulation
+cargo run --example quadrotor --release
+
+# Quadruped robot simulation  
+cargo run --example quadruped --release
 ```
+
+## URDF Requirements
+
+Before using URDF files with this plugin:
+
+1. **Mesh Paths**: Ensure all mesh file references use relative paths
+2. **Unsupported Elements**: Remove or replace `package://` URIs
+3. **Gazebo Elements**: Gazebo-specific nodes are not supported and should be removed
+
+Example of supported mesh reference:
+```xml
+<!-- Good: relative path -->
+<mesh filename="meshes/base_link.stl"/>
+
+<!-- Not supported: package URI -->
+<mesh filename="package://robot_description/meshes/base_link.stl"/>
+```
+
+## Known Limitations
+
+- Package URIs (`package://`) are not supported
+- Gazebo-specific URDF elements are ignored
+- Drone rotor animations are not yet implemented
+- Limited to STL and OBJ mesh formats
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues and pull requests.
