@@ -1,9 +1,8 @@
-use std::error::Error;
-
 use bevy::{
     color::palettes::css::WHITE, input::common_conditions::input_toggle_active, prelude::*,
 };
 use bevy_flycam::prelude::*;
+use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
@@ -34,6 +33,7 @@ fn main() {
             EguiPlugin {
                 enable_multipass_for_primary_context: true,
             },
+            InfiniteGridPlugin,
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
         ))
         .init_state::<AppState>()
@@ -47,6 +47,7 @@ fn main() {
             mouse_sensitivity: 0.00012,
             lock_cursor_to_middle: false,
         })
+        .insert_resource(ClearColor(Color::linear_rgb(1.0, 1.0, 1.0)))
         .insert_resource(UrdfRobotHandle(None))
         .insert_resource(SimulationStepCounter(0))
         .add_systems(Startup, setup)
@@ -181,12 +182,7 @@ enum AppState {
 }
 
 #[allow(deprecated)]
-fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut ew_load_robot: EventWriter<LoadRobot>,
-) {
+fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
     // Scene
     commands.insert_resource(AmbientLight {
         color: WHITE.into(),
@@ -196,11 +192,12 @@ fn setup(
 
     // ground
     commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(180., 0.1, 180.))),
-        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-        Collider::cuboid(90., 0.05, 90.),
-        Transform::from_xyz(0.0, -1.0, 0.0),
+        InfiniteGridBundle {
+            transform: Transform::from_xyz(0.0, -1.0, 0.0),
+            ..default()
+        },
         RigidBody::Fixed,
+        Collider::cuboid(900., 0.05, 900.),
     ));
 
     // load robot
