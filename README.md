@@ -1,6 +1,7 @@
 # bevy_urdf
 
-<img src="https://github.com/user-attachments/assets/1ec9c5e8-0de1-4f25-a69a-4cfba12cd8ae" width="100" alt="bevy_urdf logo">
+[![Crates.io](https://img.shields.io/crates/v/bevy_urdf.svg)](https://crates.io/crates/bevy_urdf)
+[![Crates.io](https://img.shields.io/crates/d/bevy_urdf.svg)](https://crates.io/crates/bevy_urdf)
 
 A Bevy plugin for importing robots from URDF files and running physics simulations. Ground vehicles use Rapier physics, while drones are simulated using integrated dynamics models.
 
