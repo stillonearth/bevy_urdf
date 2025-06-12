@@ -19,7 +19,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bevy_urdf = "0.1.0"  # Replace with actual version
+bevy_urdf = "0.3.0"  # Replace with actual version
 ```
 
 ## Quick Start
