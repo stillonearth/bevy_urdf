@@ -4,11 +4,8 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::{
     RapierContextColliders, RapierContextJoints, RapierContextSimulation, RapierRigidBodySet,
 };
-use nalgebra::{vector, Isometry3, Quaternion, Rotation, Rotation3, UnitQuaternion, Vector3};
-use quick_xml::events::Event;
-use quick_xml::reader::Reader;
+use nalgebra::{vector, Isometry3, Rotation3, UnitQuaternion, Vector3};
 use roxmltree::Document;
-use uav::{self, Forces, Torques};
 
 use crate::{urdf_asset_loader::UrdfAsset, URDFRobot};
 
@@ -25,7 +22,7 @@ pub struct DroneDescriptor {
 
     pub aerodynamics_props: DroneAerodynamicsProps,
     pub thrusts: Vec<f32>,
-    pub uav_state: uav::State,
+    pub uav_state: uav::dynamics::State,
 }
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -178,11 +175,11 @@ pub(crate) fn simulate_drone(
     )>,
 ) {
     let start_time = 0.0;
-    let end_time = time.elapsed_secs() as f64;
+    let end_time = time.delta_secs_f64() as f64;
 
     for (_, _, mut rigid_bodies, _, _) in q_rapier_context.iter_mut() {
         for (_, urdf_robot, mut drone) in q_drones.iter_mut() {
-            let consts = uav::Consts {
+            let consts = uav::dynamics::Consts {
                 g: 9.81, // todo: extract from rapier
                 mass: drone.mass as f64,
                 ixx: drone.ixx as f64,
@@ -203,19 +200,11 @@ pub(crate) fn simulate_drone(
 
             let (forces, torques) = quadrotor_dynamics(thrusts, drone.aerodynamics_props.clone());
 
-            match uav::simulate_drone(
+            match uav::dynamics::simulate_drone(
                 drone.uav_state,
                 consts,
-                Forces {
-                    x: forces[0] as f64,
-                    y: forces[1] as f64,
-                    z: forces[2] as f64,
-                },
-                Torques {
-                    x: torques[0] as f64,
-                    y: torques[1] as f64,
-                    z: torques[2] as f64,
-                },
+                Vector3::new(forces[0] as f64, forces[1] as f64, forces[2] as f64),
+                Vector3::new(torques[0] as f64, torques[1] as f64, torques[2] as f64),
                 (start_time, end_time),
                 1e-6,
             ) {
@@ -239,7 +228,7 @@ pub(crate) fn simulate_drone(
                         );
                         let quat = UnitQuaternion::from_rotation_matrix(&rotation);
                         let quat_fix =
-                            UnitQuaternion::from_scaled_axis(Vector3::new(PI / 2., 0.0, 0.0));
+                            UnitQuaternion::from_scaled_axis(Vector3::new(-PI / 2., 0.0, 0.0));
 
                         root_body.set_position(position.into(), false);
                         root_body.set_rotation(quat_fix * quat, false);

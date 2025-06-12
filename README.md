@@ -1,7 +1,7 @@
 # bevy_urdf
 <img src="https://github.com/user-attachments/assets/1ec9c5e8-0de1-4f25-a69a-4cfba12cd8ae" width="100">
 
-Import robots from URDF files and run simulation with rapier.
+Import robots from URDF files and run simulation with rapier. Drones are simulated by integrating dynamics model.
 
 ## API 
 
@@ -10,6 +10,7 @@ Import robots from URDF files and run simulation with rapier.
 ```rust
 UrdfPlugin,
 StlPlugin,
+ObjPlugin,
 ```
 
 2. *Load robot in your startup systems*
@@ -38,6 +39,7 @@ fn start_simulation(
         ew_spawn_robot.send(SpawnRobot {
             handle: event.handle.clone(),
             mesh_dir: event.mesh_dir.clone(),
+            robot_type: RobotType::NotDrone,
         });
         state.set(AppState::Simulation);
     }
@@ -58,20 +60,30 @@ pub struct SensorsRead {
     pub joint_angles: Vec<f32>,
 }
 
+// for ground robots / cars
 #[derive(Event)]
 pub struct ControlMotors {
     pub handle: Handle<UrdfAsset>,
     pub velocities: Vec<f32>,
+}
+
+// for ground drones
+#[derive(Event)]
+pub struct ControlThrusts {
+    pub handle: Handle<UrdfAsset>,
+    pub thrusts: Vec<f32>,
 }
 ```
 
 
 ## Limitations
 
-You may need to hand-inspect urdf files to ensure mesh links are relative to urdf file. `package://` and links and gazebo nodes are not supported.
+You may need to hand-inspect urdf files to ensure mesh links are relative paths. `package://` and links and gazebo nodes are not supported.
+Drone rotors aren't yet animated.
 
 ## Examples
 
 ```bash
-cargo run --example simulate --release
+cargo run --example quadrotor --release # drone
+cargo run --example quadruped --release # robot-dog
 ```

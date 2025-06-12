@@ -1,6 +1,6 @@
 [package]
 name = "bevy_urdf"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Import robots from URDF files and run simulation with rapier."
@@ -26,9 +26,7 @@ rand = "0.9"
 nalgebra = "0.33"
 csv = "1.3.1"
 uom = "0.37"
-# uav = "0.0.1"
-uav = {path = "../uav"}
-quick-xml = "0.37.5"
+uav = "0.1.1"
 roxmltree = "0.20"
 
 [dev-dependencies]
@@ -47,4 +45,4 @@ bevy-inspector-egui = "0.31"
 actix-web = "4.4"
 tokio = { version = "1.0", features = ["full"] }
 env_logger = "0.10"
-bevy_rl = "0.16"
+bevy_infinite_grid = { git = "https://github.com/ForesightMiningSoftwareCorporation/bevy_infinite_grid", branch = "main" }
