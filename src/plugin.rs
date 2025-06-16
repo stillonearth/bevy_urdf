@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::{RapierContextJoints, RapierRigidBodySet};
@@ -11,7 +11,7 @@ use crate::{
     events::{
         handle_control_motors, handle_despawn_robot, handle_load_robot, handle_spawn_robot,
         handle_wait_robot_loaded, ControlMotors, DespawnRobot, LoadRobot, RobotLoaded,
-        RobotSpawned, RobotType, SensorsRead, SpawnRobot, WaitRobotLoaded,
+        RobotSpawned, SensorsRead, SpawnRobot, UAVStateUpdate, WaitRobotLoaded,
     },
     urdf_asset_loader::{self, UrdfAsset},
 };
@@ -26,22 +26,37 @@ pub struct URDFRobot {
     pub robot_type: RobotType,
 }
 
-// impl Component for URDFRobot {
-//     const STORAGE_TYPE: StorageType = StorageType::Table;
+#[derive(Clone, PartialEq, PartialOrd, Copy, Debug, Reflect)]
+pub enum RobotType {
+    Drone,
+    NotDrone,
+}
 
-//     fn register_component_hooks(hooks: &mut ComponentHooks) {
-//         hooks.on_remove(|mut world, entity: Entity, _component| {
-//             let world_entity = world.entity(entity);
-//             let component = world_entity.get::<Self>().unwrap();
-//             let handle = component.handle.clone();
+impl FromStr for RobotType {
+    type Err = String;
 
-//             world.commands().queue(move |world: &mut World| {
-//                 world.send_event(DespawnRobot { handle });
-//                 world.commands().entity(entity).despawn_recursive();
-//             })
-//         });
-//     }
-// }
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "drone" => Ok(RobotType::Drone),
+            "notdrone" | "not_drone" | "not-drone" => Ok(RobotType::NotDrone),
+            _ => Err(format!("Invalid robot type: '{}'", s)),
+        }
+    }
+}
+
+impl From<String> for RobotType {
+    fn from(s: String) -> Self {
+        s.parse()
+            .unwrap_or_else(|_| panic!("Invalid robot type: '{}'", s))
+    }
+}
+
+impl From<&str> for RobotType {
+    fn from(s: &str) -> Self {
+        s.parse()
+            .unwrap_or_else(|_| panic!("Invalid robot type: '{}'", s))
+    }
+}
 
 #[derive(Component, Default, Deref)]
 pub struct URDFRobotRigidBodyHandle(pub RigidBodyHandle);
@@ -61,6 +76,7 @@ impl Plugin for UrdfPlugin {
             .add_event::<RobotLoaded>()
             .add_event::<RobotSpawned>()
             .add_event::<SensorsRead>()
+            .add_event::<UAVStateUpdate>()
             .add_event::<SpawnRobot>()
             .add_event::<WaitRobotLoaded>()
             .add_systems(

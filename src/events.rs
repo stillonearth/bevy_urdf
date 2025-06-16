@@ -9,14 +9,8 @@ use crate::{
     drones::{parse_drone_aerodynamics, DroneDescriptor},
     plugin::{extract_robot_geometry, URDFRobot, URDFRobotRigidBodyHandle},
     urdf_asset_loader::{RpyAssetLoaderSettings, UrdfAsset},
-    VisualPositionShift,
+    RobotType, VisualPositionShift,
 };
-
-#[derive(Clone, PartialEq, PartialOrd)]
-pub enum RobotType {
-    Drone,
-    NotDrone,
-}
 
 #[derive(Component)]
 pub struct Rotor {}
@@ -52,6 +46,7 @@ pub struct RobotLoaded {
     pub handle: Handle<UrdfAsset>,
     pub mesh_dir: String,
     pub marker: Option<u32>,
+    pub robot_type: RobotType,
 }
 
 #[derive(Clone, Event)]
@@ -64,6 +59,7 @@ pub struct LoadRobot {
     pub create_colliders_from_collision_shapes: bool,
     /// this field can be used to keep causality of `LoadRobot -> RobotLoaded`` event chain
     pub marker: Option<u32>,
+    pub robot_type: RobotType,
 }
 
 #[derive(Event)]
@@ -71,6 +67,12 @@ pub struct SensorsRead {
     pub handle: Handle<UrdfAsset>,
     pub transforms: Vec<Transform>,
     pub joint_angles: Vec<f32>,
+}
+
+#[derive(Event)]
+pub struct UAVStateUpdate {
+    pub handle: Handle<UrdfAsset>,
+    pub drone_state: uav::dynamics::State,
 }
 
 #[derive(Event)]
@@ -354,6 +356,7 @@ pub(crate) fn handle_load_robot(
             handle: robot_handle,
             mesh_dir: event.mesh_dir.clone().replace("assets/", ""),
             marker: event.marker,
+            robot_type: event.robot_type.clone(),
         });
     }
 }

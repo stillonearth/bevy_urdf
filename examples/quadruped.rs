@@ -9,7 +9,7 @@ use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
 
 use bevy_urdf::events::{ControlMotors, DespawnRobot, LoadRobot, RobotLoaded, RobotType};
-use bevy_urdf::events::{SensorsRead, SpawnRobot};
+use bevy_urdf::events::{ReadSensors, SpawnRobot};
 use bevy_urdf::plugin::UrdfPlugin;
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
 
@@ -122,7 +122,7 @@ fn check_rapier_state(
 }
 
 fn robot_lifecycle(
-    mut er_read_sensors: EventReader<SensorsRead>,
+    mut er_read_sensors: EventReader<ReadSensors>,
     mut simulation_step_counter: ResMut<SimulationStepCounter>,
     robot_handle: Res<UrdfRobotHandle>,
     mut er_despawn_robot: EventWriter<DespawnRobot>,

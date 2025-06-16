@@ -10,7 +10,7 @@ use bevy_rapier3d::{
 use nalgebra::{vector, Isometry3, Rotation3, UnitQuaternion, Vector3};
 use roxmltree::Document;
 
-use crate::{urdf_asset_loader::UrdfAsset, URDFRobot};
+use crate::{events::UAVStateUpdate, urdf_asset_loader::UrdfAsset, URDFRobot};
 
 #[derive(Component, Default, Debug)]
 pub struct DroneDescriptor {
@@ -173,6 +173,7 @@ pub(crate) fn simulate_drone(
         &mut RapierContextColliders,
         &mut RapierContextJoints,
     )>,
+    mut ew_uav_state_update: EventWriter<UAVStateUpdate>,
 ) {
     let start_time = 0.0;
     let end_time = time.delta_secs_f64() as f64;
@@ -237,6 +238,11 @@ pub(crate) fn simulate_drone(
                         root_body.set_position(position.into(), false);
                         root_body.set_rotation(quat_fix * quat, false);
                     }
+
+                    ew_uav_state_update.write(UAVStateUpdate {
+                        handle: urdf_robot.handle.clone(),
+                        drone_state: new_state,
+                    });
                 }
                 Err(_e) => {}
             }
@@ -262,7 +268,7 @@ fn quadrotor_dynamics(
     let f3 = f * thrusts[2];
     let f4 = f * thrusts[3];
 
-    let full_force = (f1 + f2 + f3 + f4);
+    let full_force = f1 + f2 + f3 + f4;
 
     let t1_thrust = (rotor_1_position).cross(&(f1));
     let t1_torque = torque_to_thrust_ratio * (f1);
@@ -276,8 +282,8 @@ fn quadrotor_dynamics(
     let t4_thrust = (rotor_4_position).cross(&(f4));
     let t4_torque = torque_to_thrust_ratio * (f4);
 
-    let t_thrust = (t1_thrust + t2_thrust + t3_thrust + t4_thrust);
-    let t_torque = ((t1_torque - t4_torque) - (t2_torque - t3_torque));
+    let t_thrust = t1_thrust + t2_thrust + t3_thrust + t4_thrust;
+    let t_torque = (t1_torque - t4_torque) - (t2_torque - t3_torque);
 
     let torque = t_thrust - t_torque;
 
