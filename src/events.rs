@@ -185,6 +185,11 @@ pub(crate) fn handle_spawn_robot(
                         continue;
                     }
 
+                    // don't insert rotors for now
+                    if event.robot_type == RobotType::Drone && index > 0 {
+                        break;
+                    }
+
                     let mesh_3d: Mesh3d = match geom.unwrap() {
                         urdf_rs::Geometry::Box { size } => Mesh3d(meshes.add(Cuboid::new(
                             size[0] as f32 * 2.0,

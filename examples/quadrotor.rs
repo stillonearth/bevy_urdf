@@ -8,11 +8,12 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_obj::ObjPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
+use bevy_urdf::RobotType;
 use nalgebra::{UnitQuaternion, Vector3};
 
 use bevy_urdf::drones::{ControlThrusts, DroneDescriptor};
+use bevy_urdf::events::SpawnRobot;
 use bevy_urdf::events::{LoadRobot, RobotLoaded};
-use bevy_urdf::events::{RobotType, SpawnRobot};
 use bevy_urdf::plugin::UrdfPlugin;
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
 
@@ -198,5 +199,6 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
         mesh_dir: "assets/quadrotors/crazyflie/".to_string(),
         translation_shift: None,
         urdf_path: "quadrotors/crazyflie/cf2x.urdf".to_string(),
+        robot_type: RobotType::Drone,
     });
 }

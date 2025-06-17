@@ -10,7 +10,7 @@ use bevy_rapier3d::{
 use nalgebra::{vector, Isometry3, Rotation3, UnitQuaternion, Vector3};
 use roxmltree::Document;
 
-use crate::{events::UAVStateUpdate, urdf_asset_loader::UrdfAsset, URDFRobot};
+use crate::{events::UAVStateUpdate, urdf_asset_loader::UrdfAsset, URDFRobot, URDFSettings};
 
 #[derive(Component, Default, Debug)]
 pub struct DroneDescriptor {
@@ -163,7 +163,7 @@ pub(crate) fn handle_control_thrusts(
 }
 
 pub(crate) fn simulate_drone(
-    time: Res<Time>,
+    urdf_settings: Res<URDFSettings>,
     mut q_drones: Query<(Entity, &URDFRobot, &mut DroneDescriptor)>,
     mut q_rapier_context: Query<(
         Entity,
@@ -175,17 +175,23 @@ pub(crate) fn simulate_drone(
     )>,
     mut ew_uav_state_update: EventWriter<UAVStateUpdate>,
 ) {
-    let start_time = 0.0;
-    let end_time = time.delta_secs_f64() as f64;
+    if !urdf_settings.drone_simulation_active {
+        return;
+    }
 
-    for (_, rapier_configuration, _, mut rigid_bodies, _, _) in q_rapier_context.iter_mut() {
+    for (_, rapier_configuration, rapier_simulation, mut rigid_bodies, _, _) in
+        q_rapier_context.iter_mut()
+    {
         if !rapier_configuration.physics_pipeline_active {
             continue;
         }
 
+        let start_time = 0.0;
+        let end_time = rapier_simulation.integration_parameters.dt as f64;
+
         for (_, urdf_robot, mut drone) in q_drones.iter_mut() {
             let consts = uav::dynamics::Consts {
-                g: 9.81, // todo: extract from rapier
+                g: rapier_configuration.gravity.length() as f64, // todo: extract from rapier
                 mass: drone.mass as f64,
                 ixx: drone.ixx as f64,
                 iyy: drone.iyy as f64,
@@ -213,8 +219,13 @@ pub(crate) fn simulate_drone(
                 (start_time, end_time),
                 1e-6,
             ) {
-                Ok(new_state) => {
-                    // println!("new_state {:?}", new_state);
+                Ok(mut new_state) => {
+                    // no collisions yet, fix later
+
+                    if new_state.position_z < 0.0 {
+                        new_state.position_z = 0.0;
+                        new_state.velocity_z = 0.0;
+                    }
 
                     drone.uav_state = new_state;
                     // assume root body as at link 0
