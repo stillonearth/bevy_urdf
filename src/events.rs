@@ -179,8 +179,8 @@ pub(crate) fn handle_spawn_robot(
             ec.insert((
                 URDFRobot {
                     handle: event.handle.clone(),
-                    rapier_handles: rapier_handles,
-                    robot_type: event.robot_type.clone(),
+                    rapier_handles,
+                    robot_type: event.robot_type,
                 },
                 Transform::IDENTITY.with_rotation(Quat::from_rotation_x(std::f32::consts::PI)),
                 InheritedVisibility::VISIBLE,
@@ -247,7 +247,7 @@ pub(crate) fn handle_spawn_robot(
                         URDFRobotRigidBodyHandle(body_handles[index]),
                         RapierContextEntityLink(rapier_context_simulation_entity),
                         VisualPositionShift(visual_position_shift),
-                        transform.clone(),
+                        transform,
                     ));
 
                     // insert entity id to collider data, otherwise it breaks in debug mode
@@ -275,7 +275,7 @@ pub(crate) fn handle_spawn_robot(
                             for collider_handle in collider_handles.iter() {
                                 let collider = collider_set
                                     .colliders
-                                    .get_mut(collider_handle.clone())
+                                    .get_mut(*collider_handle)
                                     .unwrap();
                                 collider.user_data = entity_id as u128;
                             }
@@ -291,8 +291,8 @@ pub(crate) fn handle_spawn_robot(
             ew_wait_robot_loaded.write(WaitRobotLoaded {
                 handle: event.handle.clone(),
                 mesh_dir: event.mesh_dir.clone(),
-                parent_entity: event.parent_entity.clone(),
-                robot_type: event.robot_type.clone(),
+                parent_entity: event.parent_entity,
+                robot_type: event.robot_type,
                 drone_descriptor: event.drone_descriptor.clone(),
             });
         }
@@ -355,16 +355,14 @@ pub(crate) fn handle_load_robot(
 ) {
     for event in er_load_robot.read() {
         let interaction_groups: Option<InteractionGroups> =
-            event.rapier_options.interaction_groups.clone();
+            event.rapier_options.interaction_groups;
         let create_colliders_from_collision_shapes = event
             .rapier_options
-            .create_colliders_from_collision_shapes
-            .clone();
+            .create_colliders_from_collision_shapes;
         let create_colliders_from_visual_shapes = event
             .rapier_options
-            .create_colliders_from_visual_shapes
-            .clone();
-        let translation_shift = event.rapier_options.translation_shift.clone();
+            .create_colliders_from_visual_shapes;
+        let translation_shift = event.rapier_options.translation_shift;
         let mesh_dir = Some(event.clone().mesh_dir);
         let robot_handle: Handle<UrdfAsset> =
             asset_server.load_with_settings(event.clone().urdf_path, move |s: &mut _| {
@@ -381,7 +379,7 @@ pub(crate) fn handle_load_robot(
             handle: robot_handle,
             mesh_dir: event.mesh_dir.clone().replace("assets/", ""),
             marker: event.marker,
-            robot_type: event.robot_type.clone(),
+            robot_type: event.robot_type,
             drone_descriptor: event.drone_descriptor.clone(),
         });
     }
@@ -395,7 +393,7 @@ pub(crate) fn handle_wait_robot_loaded(
             handle: event.handle.clone(),
             mesh_dir: event.mesh_dir.clone(),
             parent_entity: event.parent_entity,
-            robot_type: event.robot_type.clone(),
+            robot_type: event.robot_type,
             drone_descriptor: event.drone_descriptor.clone(),
         });
     }
@@ -425,12 +423,12 @@ pub(crate) fn handle_control_motors(
                                 let mut joint = link.joint.data;
 
                                 if let Some(revolute) = joint.as_revolute_mut() {
-                                    if let Some(_) = revolute.motor() {
+                                    if revolute.motor().is_some() {
                                         if event.velocities.len() < actuator_index {
                                             panic!("not enough control parameters provided");
                                         }
 
-                                        if event.velocities.len() == 0 {
+                                        if event.velocities.is_empty() {
                                             continue;
                                         }
 

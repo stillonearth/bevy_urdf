@@ -39,7 +39,7 @@ impl FromStr for RobotType {
         match s.to_lowercase().as_str() {
             "drone" => Ok(RobotType::Drone),
             "notdrone" | "not_drone" | "not-drone" => Ok(RobotType::NotDrone),
-            _ => Err(format!("Invalid robot type: '{}'", s)),
+            _ => Err(format!("Invalid robot type: '{s}'")),
         }
     }
 }
@@ -47,14 +47,14 @@ impl FromStr for RobotType {
 impl From<String> for RobotType {
     fn from(s: String) -> Self {
         s.parse()
-            .unwrap_or_else(|_| panic!("Invalid robot type: '{}'", s))
+            .unwrap_or_else(|_| panic!("Invalid robot type: '{s}'"))
     }
 }
 
 impl From<&str> for RobotType {
     fn from(s: &str) -> Self {
         s.parse()
-            .unwrap_or_else(|_| panic!("Invalid robot type: '{}'", s))
+            .unwrap_or_else(|_| panic!("Invalid robot type: '{s}'"))
     }
 }
 
@@ -207,7 +207,7 @@ fn adjust_urdf_robot_mean_position(
             robot_parts
                 .entry(urdf_robot_result.unwrap())
                 .or_default()
-                .push(transform.clone());
+                .push(*transform);
         }
     }
 
@@ -234,7 +234,7 @@ fn adjust_urdf_robot_mean_position(
     // set urdf_robots translation to mean transform
     for (_, mut transform, urdf_robot) in q_urdf_robots.iter_mut() {
         if let Some(mean_translation) = mean_translations.get(&urdf_robot.handle.clone()) {
-            transform.translation = mean_translation.clone();
+            transform.translation = *mean_translation;
         }
     }
 
@@ -246,7 +246,7 @@ fn adjust_urdf_robot_mean_position(
         }
         let handle = parent.unwrap().2.handle.clone();
         if let Some(mean_translation) = mean_translations.get(&handle) {
-            let transform_fix = quat_fix.mul_vec3(mean_translation.clone());
+            let transform_fix = quat_fix.mul_vec3(*mean_translation);
             transform.translation -= transform_fix;
         }
     }
@@ -266,8 +266,8 @@ fn read_sensors(
             if parent_entity.index() == child_of.parent().index() {
                 readings_hashmap
                     .entry(urdf_robot.handle.clone())
-                    .or_insert_with(Vec::new)
-                    .push(transform.clone());
+                    .or_default()
+                    .push(*transform);
             }
         }
 
@@ -298,7 +298,7 @@ fn read_sensors(
 
                                 joint_angles
                                     .entry(urdf_robot.handle.clone())
-                                    .or_insert_with(Vec::new)
+                                    .or_default()
                                     .push(angle);
                             }
                         }

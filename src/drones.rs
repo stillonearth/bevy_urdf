@@ -238,18 +238,16 @@ pub(crate) fn simulate_drone(
                 izz: drone.dynamics_model_props.izz as f64,
             };
 
-            if drone.thrust_commands.len() < 4 {
+            if drone.thrust_commands.len() == 0 {
                 continue;
             }
 
-            let thrusts = [
-                drone.thrust_commands[0],
-                drone.thrust_commands[1],
-                drone.thrust_commands[2],
-                drone.thrust_commands[3],
-            ];
-
-            let (forces, torques) = quadrotor_dynamics(thrusts, drone.aerodynamic_props);
+            // let (forces, torques) = quadrotor_dynamics(thrusts, drone.aerodynamic_props);
+            let (forces, torques) = multirotor_dynamics(
+                &drone.thrust_commands,
+                drone.aerodynamic_props,
+                drone.dynamics_model_props.clone(),
+            );
 
             match uav::dynamics::simulate_drone(
                 drone.uav_state,
@@ -301,44 +299,46 @@ pub(crate) fn simulate_drone(
     }
 }
 
-fn quadrotor_dynamics(
-    thrusts: [f32; 4],
+fn multirotor_dynamics(
+    thrusts: &[f32],
     aerodynamics_props: AerodynamicsProperties,
+    dynamics_props: DynamicsModelProperties,
 ) -> ([f32; 3], [f32; 3]) {
+    // Ensure we have the same number of thrusts as rotors
+    assert_eq!(thrusts.len(), dynamics_props.rotor_positions.len());
+
     let torque_to_thrust_ratio = aerodynamics_props.km / aerodynamics_props.kf;
+    let f_direction = vector![0.0, 0.0, 1.0];
 
-    let rotor_1_position = vector![0.028, -0.028, 0.0];
-    let rotor_2_position = vector![-0.028, -0.028, 0.0];
-    let rotor_3_position = vector![-0.028, 0.028, 0.0];
-    let rotor_4_position = vector![0.028, 0.028, 0.0];
+    // Calculate total force and torque
+    let mut total_force = vector![0.0, 0.0, 0.0];
+    let mut total_torque_from_thrust = vector![0.0, 0.0, 0.0];
+    let mut total_torque_from_drag = vector![0.0, 0.0, 0.0];
 
-    let f = vector![0.0, 0.0, 1.0];
-    let f1 = f * thrusts[0];
-    let f2 = f * thrusts[1];
-    let f3 = f * thrusts[2];
-    let f4 = f * thrusts[3];
+    for (i, &thrust) in thrusts.iter().enumerate() {
+        let rp = dynamics_props.rotor_positions[i];
+        let rotor_position = vector![rp.x, rp.y, rp.z];
+        let force_vector = f_direction * thrust;
 
-    let full_force = f1 + f2 + f3 + f4;
+        // Accumulate total force
+        total_force += force_vector;
 
-    let t1_thrust = (rotor_1_position).cross(&(f1));
-    let t1_torque = torque_to_thrust_ratio * (f1);
+        // Torque from thrust (position × force)
+        let torque_from_thrust = rotor_position.cross(&force_vector);
+        total_torque_from_thrust += torque_from_thrust;
 
-    let t2_thrust = (rotor_2_position).cross(&(f2));
-    let t2_torque = torque_to_thrust_ratio * (f2);
+        // Torque from rotor drag
+        // Assuming alternating rotor directions: even indices CW, odd indices CCW
+        let rotor_direction = if i % 2 == 0 { 1.0 } else { -1.0 };
+        let torque_from_drag = f_direction * (torque_to_thrust_ratio * thrust * rotor_direction);
+        total_torque_from_drag += torque_from_drag;
+    }
 
-    let t3_thrust = (rotor_3_position).cross(&(f3));
-    let t3_torque = torque_to_thrust_ratio * (f3);
-
-    let t4_thrust = (rotor_4_position).cross(&(f4));
-    let t4_torque = torque_to_thrust_ratio * (f4);
-
-    let t_thrust = t1_thrust + t2_thrust + t3_thrust + t4_thrust;
-    let t_torque = (t1_torque - t4_torque) - (t2_torque - t3_torque);
-
-    let torque = t_thrust - t_torque;
+    // Total torque is the sum of thrust-induced torque and drag torque
+    let total_torque = total_torque_from_thrust + total_torque_from_drag;
 
     (
-        [full_force.x, full_force.y, full_force.z],
-        [torque.x, torque.y, torque.z],
+        [total_force.x, total_force.y, total_force.z],
+        [total_torque.x, total_torque.y, total_torque.z],
     )
 }
