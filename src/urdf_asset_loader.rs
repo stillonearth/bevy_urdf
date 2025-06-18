@@ -81,8 +81,8 @@ impl AssetLoader for RpyAssetLoader {
 
         // hotfix robot revolute joints motors
         for (index, urdf_joint) in robot_joints.clone().iter().enumerate() {
-            let mut joint = urdf_joint.joint.clone();
-            if let Some(_) = joint.as_revolute() {
+            let mut joint = urdf_joint.joint;
+            if joint.as_revolute().is_some() {
                 joint.set_motor_velocity(JointAxis::AngX, 0.0, 1.0);
                 robot_joints[index].joint = joint;
             }

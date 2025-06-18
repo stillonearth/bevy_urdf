@@ -8,8 +8,9 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
 
-use bevy_urdf::events::{ControlMotors, DespawnRobot, LoadRobot, RobotLoaded, RobotType};
-use bevy_urdf::events::{ReadSensors, SpawnRobot};
+use bevy_urdf::events::{ControlMotors, DespawnRobot, LoadRobot, RobotLoaded, SensorsRead};
+use bevy_urdf::events::{RapierOption, SpawnRobot};
+use bevy_urdf::plugin::RobotType;
 use bevy_urdf::plugin::UrdfPlugin;
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
 
@@ -39,7 +40,6 @@ fn main() {
         .init_state::<AppState>()
         .insert_resource(MovementSettings {
             move_speed: Vec3::ONE * 3.0,
-            ..default()
         })
         .insert_resource(MouseSettings {
             invert_horizontal: false,
@@ -81,6 +81,7 @@ fn start_simulation(
             mesh_dir: event.mesh_dir.clone(),
             parent_entity: None,
             robot_type: RobotType::NotDrone,
+            drone_descriptor: None,
         });
         state.set(AppState::Simulation);
         commands.insert_resource(UrdfRobotHandle(Some(event.handle.clone())));
@@ -109,10 +110,10 @@ fn check_rapier_state(
             let mbjl = joints.multibody_joints.iter().count();
             let ijl = joints.impulse_joints.len();
 
-            println!("rigid bodies: {}", rbl);
-            println!("colliders: {}", cl);
-            println!("multibody joints: {}", mbjl);
-            println!("impulse joints: {}", ijl);
+            println!("rigid bodies: {rbl}");
+            println!("colliders: {cl}");
+            println!("multibody joints: {mbjl}");
+            println!("impulse joints: {ijl}");
         }
     }
 
@@ -122,12 +123,12 @@ fn check_rapier_state(
 }
 
 fn robot_lifecycle(
-    mut er_read_sensors: EventReader<ReadSensors>,
+    mut er_sensors_read: EventReader<SensorsRead>,
     mut simulation_step_counter: ResMut<SimulationStepCounter>,
     robot_handle: Res<UrdfRobotHandle>,
     mut er_despawn_robot: EventWriter<DespawnRobot>,
 ) {
-    for event in er_read_sensors.read() {
+    for event in er_sensors_read.read() {
         println!("Step {}", simulation_step_counter.0);
         println!("Robot: {:?}", event.handle.id());
         println!("\transforms:");
@@ -146,7 +147,7 @@ fn robot_lifecycle(
         println!("\t{}", joint_angles_string.join(" "));
         println!("------------------------------------");
 
-        if let Some(_) = robot_handle.0.clone() {
+        if robot_handle.0.clone().is_some() {
             simulation_step_counter.0 += 1;
 
             if simulation_step_counter.0 == 5000 {
@@ -202,13 +203,16 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
 
     // load robot
     ew_load_robot.send(LoadRobot {
+        robot_type: RobotType::NotDrone,
         urdf_path: "robots/flamingo_edu/urdf/Edu_v4.urdf".to_string(),
         mesh_dir: "assets/robots/flamingo_edu/urdf/".to_string(),
-        interaction_groups: None,
+        rapier_options: RapierOption {
+            interaction_groups: None,
+            translation_shift: Some(Vec3::new(0.0, 5.0, 0.0)),
+            create_colliders_from_visual_shapes: true,
+            create_colliders_from_collision_shapes: false,
+        },
         marker: None,
-        translation_shift: Some(Vec3::new(0.0, 5.0, 0.0)),
-        create_colliders_from_visual_shapes: true,
-        create_colliders_from_collision_shapes: false,
-        robot_type: RobotType::NotDrone,
+        drone_descriptor: None,
     });
 }

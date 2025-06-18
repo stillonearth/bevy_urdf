@@ -12,8 +12,8 @@ use bevy_urdf::RobotType;
 use nalgebra::{UnitQuaternion, Vector3};
 
 use bevy_urdf::drones::{ControlThrusts, DroneDescriptor};
-use bevy_urdf::events::SpawnRobot;
 use bevy_urdf::events::{LoadRobot, RobotLoaded};
+use bevy_urdf::events::{RapierOption, SpawnRobot};
 use bevy_urdf::plugin::UrdfPlugin;
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
 
@@ -65,7 +65,6 @@ fn main() {
         .init_state::<AppState>()
         .insert_resource(MovementSettings {
             move_speed: Vec3::ONE * 3.0,
-            ..default()
         })
         .insert_resource(MouseSettings {
             invert_horizontal: false,
@@ -77,7 +76,7 @@ fn main() {
         .insert_resource(ClearColor(Color::linear_rgb(1.0, 1.0, 1.0)))
         .insert_resource(UrdfRobotHandle(None))
         .add_systems(Startup, setup)
-        .add_systems(Update, (control_thrusts))
+        .add_systems(Update, control_thrusts)
         .add_systems(Update, start_simulation.run_if(in_state(AppState::Loading)))
         .run();
 }
@@ -104,6 +103,7 @@ fn start_simulation(
             mesh_dir: event.mesh_dir.clone(),
             parent_entity: Some(q_crazflie.iter().last().unwrap().0),
             robot_type: RobotType::Drone,
+            drone_descriptor: event.drone_descriptor.clone(),
         });
         state.set(AppState::Simulation);
         commands.insert_resource(UrdfRobotHandle(Some(event.handle.clone())));
@@ -192,13 +192,16 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
 
     // load robot
     ew_load_robot.send(LoadRobot {
-        create_colliders_from_collision_shapes: true,
-        create_colliders_from_visual_shapes: false,
-        interaction_groups: None,
-        marker: None,
-        mesh_dir: "assets/quadrotors/crazyflie/".to_string(),
-        translation_shift: None,
-        urdf_path: "quadrotors/crazyflie/cf2x.urdf".to_string(),
         robot_type: RobotType::Drone,
+        urdf_path: "quadrotors/crazyflie/cf2x.urdf".to_string(),
+        mesh_dir: "assets/quadrotors/crazyflie/".to_string(),
+        marker: None,
+        rapier_options: RapierOption {
+            create_colliders_from_collision_shapes: true,
+            create_colliders_from_visual_shapes: false,
+            interaction_groups: None,
+            translation_shift: None,
+        },
+        drone_descriptor: None,
     });
 }

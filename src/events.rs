@@ -6,7 +6,10 @@ use rapier3d::prelude::{InteractionGroups, MultibodyJointHandle, RigidBodyHandle
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobotHandles};
 
 use crate::{
-    drones::{parse_drone_aerodynamics, DroneDescriptor},
+    drones::{
+        try_extract_drone_aerodynamics_properties,
+        try_extract_drone_visual_and_dynamics_model_properties, DroneDescriptor,
+    },
     plugin::{extract_robot_geometry, URDFRobot, URDFRobotRigidBodyHandle},
     urdf_asset_loader::{RpyAssetLoaderSettings, UrdfAsset},
     RobotType, VisualPositionShift,
@@ -21,6 +24,7 @@ pub struct SpawnRobot {
     pub mesh_dir: String,
     pub parent_entity: Option<Entity>,
     pub robot_type: RobotType,
+    pub drone_descriptor: Option<DroneDescriptor>,
 }
 
 #[derive(Clone, Event)]
@@ -39,6 +43,7 @@ pub struct WaitRobotLoaded {
     pub mesh_dir: String,
     pub parent_entity: Option<Entity>,
     pub robot_type: RobotType,
+    pub drone_descriptor: Option<DroneDescriptor>,
 }
 
 #[derive(Clone, Event)]
@@ -47,19 +52,26 @@ pub struct RobotLoaded {
     pub mesh_dir: String,
     pub marker: Option<u32>,
     pub robot_type: RobotType,
+    pub drone_descriptor: Option<DroneDescriptor>,
 }
 
-#[derive(Clone, Event)]
-pub struct LoadRobot {
-    pub urdf_path: String,
-    pub mesh_dir: String,
+#[derive(Clone)]
+pub struct RapierOption {
     pub interaction_groups: Option<InteractionGroups>,
     pub translation_shift: Option<Vec3>,
     pub create_colliders_from_visual_shapes: bool,
     pub create_colliders_from_collision_shapes: bool,
-    /// this field can be used to keep causality of `LoadRobot -> RobotLoaded`` event chain
-    pub marker: Option<u32>,
+}
+
+#[derive(Clone, Event)]
+pub struct LoadRobot {
     pub robot_type: RobotType,
+    pub urdf_path: String,
+    pub mesh_dir: String,
+    pub rapier_options: RapierOption,
+    pub drone_descriptor: Option<DroneDescriptor>,
+    /// this field can be used to keep causality of `LoadRobot -> RobotLoaded` event chain
+    pub marker: Option<u32>,
 }
 
 #[derive(Event)]
@@ -102,10 +114,11 @@ pub(crate) fn handle_spawn_robot(
     for event in er_spawn_robot.read() {
         let rapier_context_simulation_entity = q_rapier_context_simulation.iter().next().unwrap().0;
         let robot_handle = event.handle.clone();
+        let mut drone_descriptor = event.drone_descriptor.clone();
+
         if let Some(urdf) = urdf_assets.get(robot_handle.id()) {
             let mut maybe_rapier_handles: Option<UrdfRobotHandles<Option<MultibodyJointHandle>>> =
                 None;
-            let mut drone_descriptor = DroneDescriptor { ..default() };
 
             // let mut handles: Option<UrdfRobotHandles<ImpulseJointHandle>> = None;
             for (_entity, mut rigid_body_set, mut collider_set, mut multibidy_joint_set) in
@@ -114,29 +127,22 @@ pub(crate) fn handle_spawn_robot(
                 let urdf_robot = urdf.urdf_robot.clone();
 
                 // do stuff if robot is a copter
-                if event.robot_type == RobotType::Drone {
-                    // try extracting aerodynamics props
-                    if let Ok(aerodynamics_props) = parse_drone_aerodynamics(&urdf.xml_string) {
-                        drone_descriptor.aerodynamics_props = aerodynamics_props;
-                    }
+                if event.robot_type == RobotType::Drone && drone_descriptor.is_none() {
+                    // extract model parameters automatically or fill "by-hand"
+                    let urdf_asset = urdf_assets.get(&event.handle).unwrap();
+                    let adp =
+                        try_extract_drone_aerodynamics_properties(&urdf_asset.xml_string).unwrap();
+                    let (dmp, vbp) = try_extract_drone_visual_and_dynamics_model_properties(
+                        &urdf_asset.xml_string,
+                    )
+                    .unwrap();
 
-                    for i in 0..urdf.urdf_robot.links.len() {
-                        if i == 0 {
-                            drone_descriptor.mass = urdf.robot.links[i].inertial.mass.value as f32;
-                            drone_descriptor.ixx = urdf.robot.links[i].inertial.inertia.ixx as f32;
-                            drone_descriptor.iyy = urdf.robot.links[i].inertial.inertia.iyy as f32;
-                            drone_descriptor.izz = urdf.robot.links[i].inertial.inertia.izz as f32;
-                        } else {
-                            let prop_origin = urdf.robot.links[i].inertial.origin.xyz;
-                            if prop_origin.0 != [0.0, 0.0, 0.0] {
-                                drone_descriptor.rotor_positions.push(Vec3::new(
-                                    prop_origin.0[0] as f32,
-                                    prop_origin.0[1] as f32,
-                                    prop_origin.0[2] as f32,
-                                ));
-                            }
-                        }
-                    }
+                    drone_descriptor = Some(DroneDescriptor {
+                        aerodynamic_props: adp,
+                        dynamics_model_props: dmp,
+                        visual_body_properties: vbp,
+                        ..default()
+                    });
                 }
 
                 maybe_rapier_handles = Some(urdf_robot.clone().insert_using_multibody_joints(
@@ -167,7 +173,7 @@ pub(crate) fn handle_spawn_robot(
             };
 
             if event.robot_type == RobotType::Drone {
-                ec.insert(drone_descriptor);
+                ec.insert(drone_descriptor.clone().unwrap());
             }
 
             ec.insert((
@@ -253,7 +259,14 @@ pub(crate) fn handle_spawn_robot(
                         {
                             // make robot a kinematic body if we're simulating a drone
                             // assume root body index is 0
-                            if event.robot_type == RobotType::Drone && index == 0 {
+                            if event.robot_type == RobotType::Drone
+                                && index
+                                    == drone_descriptor
+                                        .clone()
+                                        .unwrap()
+                                        .visual_body_properties
+                                        .root_body_index
+                            {
                                 rigid_body
                                     .set_body_type(RigidBodyType::KinematicPositionBased, false);
                             }
@@ -280,6 +293,7 @@ pub(crate) fn handle_spawn_robot(
                 mesh_dir: event.mesh_dir.clone(),
                 parent_entity: event.parent_entity.clone(),
                 robot_type: event.robot_type.clone(),
+                drone_descriptor: event.drone_descriptor.clone(),
             });
         }
     }
@@ -340,11 +354,17 @@ pub(crate) fn handle_load_robot(
     mut ew_robot_loaded: EventWriter<RobotLoaded>,
 ) {
     for event in er_load_robot.read() {
-        let interaction_groups: Option<InteractionGroups> = event.interaction_groups.clone();
-        let create_colliders_from_collision_shapes =
-            event.create_colliders_from_collision_shapes.clone();
-        let create_colliders_from_visual_shapes = event.create_colliders_from_visual_shapes.clone();
-        let translation_shift = event.translation_shift.clone();
+        let interaction_groups: Option<InteractionGroups> =
+            event.rapier_options.interaction_groups.clone();
+        let create_colliders_from_collision_shapes = event
+            .rapier_options
+            .create_colliders_from_collision_shapes
+            .clone();
+        let create_colliders_from_visual_shapes = event
+            .rapier_options
+            .create_colliders_from_visual_shapes
+            .clone();
+        let translation_shift = event.rapier_options.translation_shift.clone();
         let mesh_dir = Some(event.clone().mesh_dir);
         let robot_handle: Handle<UrdfAsset> =
             asset_server.load_with_settings(event.clone().urdf_path, move |s: &mut _| {
@@ -362,6 +382,7 @@ pub(crate) fn handle_load_robot(
             mesh_dir: event.mesh_dir.clone().replace("assets/", ""),
             marker: event.marker,
             robot_type: event.robot_type.clone(),
+            drone_descriptor: event.drone_descriptor.clone(),
         });
     }
 }
@@ -375,6 +396,7 @@ pub(crate) fn handle_wait_robot_loaded(
             mesh_dir: event.mesh_dir.clone(),
             parent_entity: event.parent_entity,
             robot_type: event.robot_type.clone(),
+            drone_descriptor: event.drone_descriptor.clone(),
         });
     }
 }

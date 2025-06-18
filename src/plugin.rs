@@ -32,25 +32,6 @@ pub enum RobotType {
     NotDrone,
 }
 
-#[derive(Resource, Debug)]
-pub struct URDFSettings {
-    pub drone_simulation_active: bool,
-}
-
-impl Default for URDFSettings {
-    fn default() -> Self {
-        Self {
-            drone_simulation_active: true,
-        }
-    }
-}
-
-impl URDFSettings {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
 impl FromStr for RobotType {
     type Err = String;
 
@@ -88,7 +69,6 @@ pub struct VisualPositionShift(pub Vec3);
 impl Plugin for UrdfPlugin {
     fn build(&self, app: &mut App) {
         app.init_asset_loader::<urdf_asset_loader::RpyAssetLoader>()
-            .insert_resource(URDFSettings::new())
             .add_event::<ControlMotors>()
             .add_event::<ControlThrusts>()
             .add_event::<DespawnRobot>()

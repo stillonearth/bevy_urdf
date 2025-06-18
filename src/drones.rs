@@ -1,5 +1,6 @@
 use std::f32::consts::PI;
 
+use anyhow::Error;
 use bevy::prelude::*;
 use bevy_rapier3d::{
     plugin::RapierConfiguration,
@@ -10,26 +11,20 @@ use bevy_rapier3d::{
 use nalgebra::{vector, Isometry3, Rotation3, UnitQuaternion, Vector3};
 use roxmltree::Document;
 
-use crate::{events::UAVStateUpdate, urdf_asset_loader::UrdfAsset, URDFRobot, URDFSettings};
+use crate::{events::UAVStateUpdate, urdf_asset_loader::UrdfAsset, URDFRobot};
 
-#[derive(Component, Default, Debug)]
+#[derive(Component, Default, Debug, Clone)]
 pub struct DroneDescriptor {
-    pub mass: f32,
-    pub ixx: f32,
-    pub iyy: f32,
-    pub izz: f32,
-    pub rotor_positions: Vec<Vec3>,
+    pub aerodynamic_props: AerodynamicsProperties,
+    pub dynamics_model_props: DynamicsModelProperties,
+    pub visual_body_properties: VisualBodyProperties,
 
-    pub root_body_index: usize,
-    pub rotor_indices: Vec<usize>,
-
-    pub aerodynamics_props: DroneAerodynamicsProps,
-    pub thrusts: Vec<f32>,
+    pub thrust_commands: Vec<f32>,
     pub uav_state: uav::dynamics::State,
 }
 
 #[derive(Default, Debug, Clone, Copy)]
-pub struct DroneAerodynamicsProps {
+pub struct AerodynamicsProperties {
     pub kf: f32,
     pub km: f32,
     pub thrust2weight: f32,
@@ -41,6 +36,21 @@ pub struct DroneAerodynamicsProps {
     pub dw_coeff_1: f32,
     pub dw_coeff_2: f32,
     pub dw_coeff_3: f32,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct DynamicsModelProperties {
+    pub mass: f32,
+    pub ixx: f32,
+    pub iyy: f32,
+    pub izz: f32,
+    pub rotor_positions: Vec<Vec3>,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct VisualBodyProperties {
+    pub root_body_index: usize,
+    pub rotor_body_indices: Vec<usize>,
 }
 
 #[derive(Event)]
@@ -59,10 +69,10 @@ pub enum ParseError {
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParseError::XmlError(e) => write!(f, "XML parsing error: {}", e),
+            ParseError::XmlError(e) => write!(f, "XML parsing error: {e}"),
             ParseError::MissingProperties => write!(f, "Missing properties element"),
             ParseError::InvalidFloat(attr) => {
-                write!(f, "Invalid float value for attribute: {}", attr)
+                write!(f, "Invalid float value for attribute: {attr}")
             }
         }
     }
@@ -76,7 +86,9 @@ impl From<roxmltree::Error> for ParseError {
     }
 }
 
-pub fn parse_drone_aerodynamics(xml_content: &str) -> Result<DroneAerodynamicsProps, ParseError> {
+pub fn try_extract_drone_aerodynamics_properties(
+    xml_content: &str,
+) -> Result<AerodynamicsProperties, ParseError> {
     let doc = Document::parse(xml_content)?;
 
     // Find the properties element
@@ -85,7 +97,7 @@ pub fn parse_drone_aerodynamics(xml_content: &str) -> Result<DroneAerodynamicsPr
         .find(|n| n.has_tag_name("properties"))
         .ok_or(ParseError::MissingProperties)?;
 
-    let mut props = DroneAerodynamicsProps::default();
+    let mut props = AerodynamicsProperties::default();
 
     // Helper function to parse an attribute
     let parse_attr = |attr_name: &str| -> Result<Option<f32>, ParseError> {
@@ -147,6 +159,39 @@ pub fn parse_drone_aerodynamics(xml_content: &str) -> Result<DroneAerodynamicsPr
     Ok(props)
 }
 
+pub fn try_extract_drone_visual_and_dynamics_model_properties(
+    xml_content: &str,
+) -> Result<(DynamicsModelProperties, VisualBodyProperties), Error> {
+    let urdf_robot = urdf_rs::read_from_string(xml_content)?;
+    let mut visual_body_props = VisualBodyProperties { ..default() };
+    let mut dynamics_model_properties = DynamicsModelProperties { ..default() };
+
+    for (index, link) in urdf_robot.links.iter().enumerate() {
+        // probably it's a drone body
+        if link.name.contains("base_") && link.inertial.mass.value != 0.0 {
+            visual_body_props.root_body_index = index;
+            dynamics_model_properties.ixx = link.inertial.inertia.ixx as f32;
+            dynamics_model_properties.iyy = link.inertial.inertia.iyy as f32;
+            dynamics_model_properties.izz = link.inertial.inertia.izz as f32;
+            dynamics_model_properties.mass = link.inertial.mass.value as f32;
+        }
+
+        // probably it's a propeller
+        if link.name.contains("prop") {
+            let prop_origin = link.inertial.origin.xyz.0;
+            visual_body_props.rotor_body_indices.push(index);
+            dynamics_model_properties.rotor_positions.push(Vec3::new(
+                prop_origin[0] as f32,
+                prop_origin[1] as f32,
+                prop_origin[2] as f32,
+            ));
+            visual_body_props.rotor_body_indices.push(index);
+        }
+    }
+
+    Ok((dynamics_model_properties, visual_body_props))
+}
+
 pub(crate) fn handle_control_thrusts(
     mut er_control_thrusts: EventReader<ControlThrusts>,
     mut q_urdf_robots: Query<(Entity, &URDFRobot, &mut DroneDescriptor)>,
@@ -157,13 +202,12 @@ pub(crate) fn handle_control_thrusts(
             if event.handle != robot.handle {
                 continue;
             }
-            descriptor.thrusts = event.thrusts.clone();
+            descriptor.thrust_commands = event.thrusts.clone();
         }
     }
 }
 
 pub(crate) fn simulate_drone(
-    urdf_settings: Res<URDFSettings>,
     mut q_drones: Query<(Entity, &URDFRobot, &mut DroneDescriptor)>,
     mut q_rapier_context: Query<(
         Entity,
@@ -175,10 +219,6 @@ pub(crate) fn simulate_drone(
     )>,
     mut ew_uav_state_update: EventWriter<UAVStateUpdate>,
 ) {
-    if !urdf_settings.drone_simulation_active {
-        return;
-    }
-
     for (_, rapier_configuration, rapier_simulation, mut rigid_bodies, _, _) in
         q_rapier_context.iter_mut()
     {
@@ -191,25 +231,25 @@ pub(crate) fn simulate_drone(
 
         for (_, urdf_robot, mut drone) in q_drones.iter_mut() {
             let consts = uav::dynamics::Consts {
-                g: rapier_configuration.gravity.length() as f64, // todo: extract from rapier
-                mass: drone.mass as f64,
-                ixx: drone.ixx as f64,
-                iyy: drone.iyy as f64,
-                izz: drone.izz as f64,
+                g: rapier_configuration.gravity.length() as f64,
+                mass: drone.dynamics_model_props.mass as f64,
+                ixx: drone.dynamics_model_props.ixx as f64,
+                iyy: drone.dynamics_model_props.iyy as f64,
+                izz: drone.dynamics_model_props.izz as f64,
             };
 
-            if drone.thrusts.len() < 4 {
+            if drone.thrust_commands.len() < 4 {
                 continue;
             }
 
             let thrusts = [
-                drone.thrusts[0],
-                drone.thrusts[1],
-                drone.thrusts[2],
-                drone.thrusts[3],
+                drone.thrust_commands[0],
+                drone.thrust_commands[1],
+                drone.thrust_commands[2],
+                drone.thrust_commands[3],
             ];
 
-            let (forces, torques) = quadrotor_dynamics(thrusts, drone.aerodynamics_props.clone());
+            let (forces, torques) = quadrotor_dynamics(thrusts, drone.aerodynamic_props);
 
             match uav::dynamics::simulate_drone(
                 drone.uav_state,
@@ -246,7 +286,7 @@ pub(crate) fn simulate_drone(
                         let quat_fix =
                             UnitQuaternion::from_scaled_axis(Vector3::new(-PI / 2., 0.0, 0.0));
 
-                        root_body.set_position(position.into(), false);
+                        root_body.set_position(position, false);
                         root_body.set_rotation(quat_fix * quat, false);
                     }
 
@@ -263,9 +303,8 @@ pub(crate) fn simulate_drone(
 
 fn quadrotor_dynamics(
     thrusts: [f32; 4],
-    aerodynamics_props: DroneAerodynamicsProps,
+    aerodynamics_props: AerodynamicsProperties,
 ) -> ([f32; 3], [f32; 3]) {
-    // let torque_to_thrust_ratio = 7.94e-12 / 3.16e-10;
     let torque_to_thrust_ratio = aerodynamics_props.km / aerodynamics_props.kf;
 
     let rotor_1_position = vector![0.028, -0.028, 0.0];
@@ -298,8 +337,8 @@ fn quadrotor_dynamics(
 
     let torque = t_thrust - t_torque;
 
-    return (
+    (
         [full_force.x, full_force.y, full_force.z],
         [torque.x, torque.y, torque.z],
-    );
+    )
 }
