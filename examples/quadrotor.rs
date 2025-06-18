@@ -110,6 +110,57 @@ fn start_simulation(
     }
 }
 
+// fn control_thrusts(
+//     robot_handle: Res<UrdfRobotHandle>,
+//     mut ew_control_motors: EventWriter<ControlThrusts>,
+//     mut controller: ResMut<QuadcopterController>,
+//     q_drone: Query<(Entity, &DroneDescriptor)>,
+// ) {
+//     if let Some(handle) = robot_handle.0.clone() {
+//         for (_, drone_descriptor) in q_drone.iter() {
+//             let uav_state: uav::dynamics::State = drone_descriptor.uav_state;
+
+//             let t_pos = Vector3::new(-5., -5., 10.);
+//             let t_vel = Vector3::new(0.0, 0.0, 0.0);
+//             let t_acc = Vector3::new(0.0, 0.0, 0.0);
+//             let t_att = UnitQuaternion::identity();
+
+//             let est_pos = Vector3::new(
+//                 uav_state.position_x,
+//                 uav_state.position_y,
+//                 uav_state.position_z,
+//             );
+//             let est_vel = Vector3::new(
+//                 uav_state.velocity_x,
+//                 uav_state.velocity_y,
+//                 uav_state.velocity_z,
+//             );
+//             let est_omega = Vector3::new(
+//                 -uav_state.roll_rate,
+//                 -uav_state.pitch_rate,
+//                 uav_state.yaw_rate,
+//             );
+//             let est_att =
+//                 UnitQuaternion::from_euler_angles(uav_state.roll, uav_state.pitch, uav_state.yaw);
+
+//             let thrusts = controller.0.run_control(
+//                 t_pos, t_vel, t_acc, t_att, est_pos, est_vel, est_omega, est_att,
+//             );
+
+//             // change order or rotors in commands
+//             ew_control_motors.write(ControlThrusts {
+//                 handle: handle.clone(),
+//                 thrusts: vec![
+//                     thrusts[0] as f32,
+//                     thrusts[2] as f32,
+//                     thrusts[3] as f32,
+//                     thrusts[1] as f32,
+//                 ],
+//             });
+//         }
+//     }
+// }
+
 fn control_thrusts(
     robot_handle: Res<UrdfRobotHandle>,
     mut ew_control_motors: EventWriter<ControlThrusts>,
@@ -120,7 +171,7 @@ fn control_thrusts(
         for (_, drone_descriptor) in q_drone.iter() {
             let uav_state: uav::dynamics::State = drone_descriptor.uav_state;
 
-            let t_pos = Vector3::new(-5., -5., 10.);
+            let t_pos = Vector3::new(1., 0., 3.);
             let t_vel = Vector3::new(0.0, 0.0, 0.0);
             let t_acc = Vector3::new(0.0, 0.0, 0.0);
             let t_att = UnitQuaternion::identity();
