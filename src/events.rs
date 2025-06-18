@@ -128,7 +128,7 @@ pub(crate) fn handle_spawn_robot(
 
                 // do stuff if robot is a copter
                 if event.robot_type == RobotType::Drone && drone_descriptor.is_none() {
-                    // extract model parameters automatically or fill "by-hand"
+                    // extract model parameters automatically or fill manually if drone_descriptor is not none
                     let urdf_asset = urdf_assets.get(&event.handle).unwrap();
                     let adp =
                         try_extract_drone_aerodynamics_properties(&urdf_asset.xml_string).unwrap();
@@ -259,24 +259,22 @@ pub(crate) fn handle_spawn_robot(
                         {
                             // make robot a kinematic body if we're simulating a drone
                             // assume root body index is 0
-                            if event.robot_type == RobotType::Drone
-                                && index
-                                    == drone_descriptor
-                                        .clone()
-                                        .unwrap()
-                                        .visual_body_properties
-                                        .root_body_index
-                            {
-                                rigid_body
-                                    .set_body_type(RigidBodyType::KinematicPositionBased, false);
-                            }
+                            // if event.robot_type == RobotType::Drone
+                            //     && index
+                            //         == drone_descriptor
+                            //             .clone()
+                            //             .unwrap()
+                            //             .visual_body_properties
+                            //             .root_body_index
+                            // {
+                            //     rigid_body
+                            //         .set_body_type(RigidBodyType::KinematicPositionBased, false);
+                            // }
 
                             let collider_handles = rigid_body.colliders();
                             for collider_handle in collider_handles.iter() {
-                                let collider = collider_set
-                                    .colliders
-                                    .get_mut(*collider_handle)
-                                    .unwrap();
+                                let collider =
+                                    collider_set.colliders.get_mut(*collider_handle).unwrap();
                                 collider.user_data = entity_id as u128;
                             }
                         }
@@ -354,14 +352,11 @@ pub(crate) fn handle_load_robot(
     mut ew_robot_loaded: EventWriter<RobotLoaded>,
 ) {
     for event in er_load_robot.read() {
-        let interaction_groups: Option<InteractionGroups> =
-            event.rapier_options.interaction_groups;
-        let create_colliders_from_collision_shapes = event
-            .rapier_options
-            .create_colliders_from_collision_shapes;
-        let create_colliders_from_visual_shapes = event
-            .rapier_options
-            .create_colliders_from_visual_shapes;
+        let interaction_groups: Option<InteractionGroups> = event.rapier_options.interaction_groups;
+        let create_colliders_from_collision_shapes =
+            event.rapier_options.create_colliders_from_collision_shapes;
+        let create_colliders_from_visual_shapes =
+            event.rapier_options.create_colliders_from_visual_shapes;
         let translation_shift = event.rapier_options.translation_shift;
         let mesh_dir = Some(event.clone().mesh_dir);
         let robot_handle: Handle<UrdfAsset> =

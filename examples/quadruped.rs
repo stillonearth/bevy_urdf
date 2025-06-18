@@ -204,8 +204,8 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
     // load robot
     ew_load_robot.send(LoadRobot {
         robot_type: RobotType::NotDrone,
-        urdf_path: "robots/flamingo_edu/urdf/Edu_v4.urdf".to_string(),
-        mesh_dir: "assets/robots/flamingo_edu/urdf/".to_string(),
+        urdf_path: "robots/unitree_a1/urdf/a1.urdf".to_string(),
+        mesh_dir: "assets/robots/unitree_a1/urdf/".to_string(),
         rapier_options: RapierOption {
             interaction_groups: None,
             translation_shift: Some(Vec3::new(0.0, 5.0, 0.0)),

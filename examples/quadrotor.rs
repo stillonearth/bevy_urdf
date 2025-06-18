@@ -177,7 +177,11 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
         ..default()
     });
 
-    commands.spawn((Crazyflie, Name::new("drone")));
+    commands.spawn((
+        Crazyflie,
+        Name::new("drone"),
+        Transform::from_translation(Vec3::new(0.0, 10.0, 0.0)),
+    ));
 
     // ground
     commands.spawn((
@@ -187,12 +191,11 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
         },
         RigidBody::Fixed,
         Collider::cuboid(900., 0.05, 900.),
-        Name::new("ground"),
     ));
 
     // load robot
     ew_load_robot.send(LoadRobot {
-        robot_type: RobotType::Drone,
+        robot_type: RobotType::NotDrone,
         urdf_path: "quadrotors/crazyflie/cf2x.urdf".to_string(),
         mesh_dir: "assets/quadrotors/crazyflie/".to_string(),
         marker: None,
@@ -200,7 +203,7 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
             create_colliders_from_collision_shapes: true,
             create_colliders_from_visual_shapes: false,
             interaction_groups: None,
-            translation_shift: None,
+            translation_shift: Some(Vec3::new(0.0, 1.0, 0.0)),
         },
         drone_descriptor: None,
     });

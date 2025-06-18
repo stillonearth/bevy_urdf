@@ -9,15 +9,24 @@ use bevy_rapier3d::{
     },
 };
 use nalgebra::{vector, Isometry3, Rotation3, UnitQuaternion, Vector3};
+use rapier3d::prelude::RigidBodyType;
 use roxmltree::Document;
 
 use crate::{events::UAVStateUpdate, urdf_asset_loader::UrdfAsset, URDFRobot};
+
+#[derive(Default, Debug, Clone, PartialEq)]
+pub enum DronePhysics {
+    RapierPhysics,
+    #[default]
+    ODEPhysics,
+}
 
 #[derive(Component, Default, Debug, Clone)]
 pub struct DroneDescriptor {
     pub aerodynamic_props: AerodynamicsProperties,
     pub dynamics_model_props: DynamicsModelProperties,
     pub visual_body_properties: VisualBodyProperties,
+    pub drone_physics: DronePhysics,
 
     pub thrust_commands: Vec<f32>,
     pub uav_state: uav::dynamics::State,
@@ -248,51 +257,84 @@ pub(crate) fn simulate_drone(
                 &drone.dynamics_model_props,
             );
 
-            match uav::dynamics::simulate_drone(
-                drone.uav_state,
-                consts,
-                Vector3::new(forces[0] as f64, forces[1] as f64, forces[2] as f64),
-                Vector3::new(torques[0] as f64, torques[1] as f64, torques[2] as f64),
-                (start_time, end_time),
-                1e-6,
-            ) {
-                Ok(mut new_state) => {
-                    // no collisions yet, fix later
+            if drone.drone_physics == DronePhysics::ODEPhysics {
+                match uav::dynamics::simulate_drone(
+                    drone.uav_state,
+                    consts,
+                    Vector3::new(forces[0] as f64, forces[1] as f64, forces[2] as f64),
+                    Vector3::new(torques[0] as f64, torques[1] as f64, torques[2] as f64),
+                    (start_time, end_time),
+                    1e-6,
+                ) {
+                    Ok(new_state) => {
+                        drone.uav_state = new_state;
+                        // assume root body as at link 0
+                        let root_body_handle = &urdf_robot.rapier_handles.links
+                            [drone.visual_body_properties.root_body_index]
+                            .body;
+                        if let Some(root_body) = rigid_bodies.bodies.get_mut(*root_body_handle) {
+                            root_body.set_body_type(RigidBodyType::KinematicPositionBased, false);
+                            let position = Isometry3::translation(
+                                new_state.position_x as f32,
+                                new_state.position_z as f32,
+                                new_state.position_y as f32,
+                            );
 
-                    if new_state.position_z < 0.0 {
-                        new_state.position_z = 0.0;
-                        new_state.velocity_z = 0.0;
+                            let rotation = Rotation3::from_euler_angles(
+                                new_state.roll as f32,
+                                new_state.pitch as f32,
+                                new_state.yaw as f32,
+                            );
+                            let quat = UnitQuaternion::from_rotation_matrix(&rotation);
+                            let quat_fix =
+                                UnitQuaternion::from_scaled_axis(Vector3::new(-PI / 2., 0.0, 0.0));
+
+                            root_body.set_position(position, false);
+                            root_body.set_rotation(quat_fix * quat, false);
+                        }
+
+                        ew_uav_state_update.write(UAVStateUpdate {
+                            handle: urdf_robot.handle.clone(),
+                            drone_state: new_state,
+                        });
                     }
-
-                    drone.uav_state = new_state;
-                    // assume root body as at link 0
-                    let root_body_handle = &urdf_robot.rapier_handles.links[0].body;
-                    if let Some(root_body) = rigid_bodies.bodies.get_mut(*root_body_handle) {
-                        let position = Isometry3::translation(
-                            new_state.position_x as f32,
-                            new_state.position_z as f32,
-                            new_state.position_y as f32,
-                        );
-
-                        let rotation = Rotation3::from_euler_angles(
-                            new_state.roll as f32,
-                            new_state.pitch as f32,
-                            new_state.yaw as f32,
-                        );
-                        let quat = UnitQuaternion::from_rotation_matrix(&rotation);
-                        let quat_fix =
-                            UnitQuaternion::from_scaled_axis(Vector3::new(-PI / 2., 0.0, 0.0));
-
-                        root_body.set_position(position, false);
-                        root_body.set_rotation(quat_fix * quat, false);
-                    }
-
-                    ew_uav_state_update.write(UAVStateUpdate {
-                        handle: urdf_robot.handle.clone(),
-                        drone_state: new_state,
-                    });
+                    Err(_e) => {}
                 }
-                Err(_e) => {}
+            } else if drone.drone_physics == DronePhysics::RapierPhysics {
+                let root_body_handle = &urdf_robot.rapier_handles.links
+                    [drone.visual_body_properties.root_body_index]
+                    .body;
+
+                if let Some(root_body) = rigid_bodies.bodies.get_mut(*root_body_handle) {
+                    root_body.set_body_type(RigidBodyType::Dynamic, false);
+                    root_body.reset_forces(false);
+                    root_body.reset_torques(false);
+                    let rotation = *root_body.rotation();
+                    let position = *root_body.position().translation;
+                    let omega = *root_body.angvel();
+                    let velocity = *root_body.linvel();
+                    let euler_angles = rotation.euler_angles();
+
+                    let forces = rotation * vector![forces[0], forces[1], forces[2]];
+                    let torques = rotation * vector![torques[0], torques[1], torques[2]];
+
+                    root_body.add_force(forces, true);
+                    root_body.add_torque(torques, true);
+
+                    // sync drone state
+                    drone.uav_state.position_x = position.x as f64;
+                    drone.uav_state.position_y = position.y as f64;
+                    drone.uav_state.position_z = position.z as f64;
+                    drone.uav_state.velocity_x = velocity.x as f64;
+                    drone.uav_state.velocity_y = velocity.y as f64;
+                    drone.uav_state.velocity_z = velocity.z as f64;
+                    drone.uav_state.roll = euler_angles.0 as f64;
+                    drone.uav_state.pitch = euler_angles.1 as f64;
+                    drone.uav_state.yaw = euler_angles.2 as f64;
+                    drone.uav_state.roll_rate = omega.x as f64;
+                    drone.uav_state.pitch_rate = omega.y as f64;
+                    drone.uav_state.yaw_rate = omega.z as f64;
+                }
             }
         }
     }
