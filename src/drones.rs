@@ -185,7 +185,6 @@ pub fn try_extract_drone_visual_and_dynamics_model_properties(
                 prop_origin[1] as f32,
                 prop_origin[2] as f32,
             ));
-            visual_body_props.rotor_body_indices.push(index);
         }
     }
 
@@ -245,8 +244,8 @@ pub(crate) fn simulate_drone(
             // let (forces, torques) = quadrotor_dynamics(thrusts, drone.aerodynamic_props);
             let (forces, torques) = multirotor_dynamics(
                 &drone.thrust_commands,
-                drone.aerodynamic_props,
-                drone.dynamics_model_props.clone(),
+                &drone.aerodynamic_props,
+                &drone.dynamics_model_props,
             );
 
             match uav::dynamics::simulate_drone(
@@ -301,8 +300,8 @@ pub(crate) fn simulate_drone(
 
 fn multirotor_dynamics(
     thrusts: &[f32],
-    aerodynamics_props: AerodynamicsProperties,
-    dynamics_props: DynamicsModelProperties,
+    aerodynamics_props: &AerodynamicsProperties,
+    dynamics_props: &DynamicsModelProperties,
 ) -> ([f32; 3], [f32; 3]) {
     // Ensure we have the same number of thrusts as rotors
     assert_eq!(thrusts.len(), dynamics_props.rotor_positions.len());
