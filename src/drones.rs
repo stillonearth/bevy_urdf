@@ -21,6 +21,15 @@ pub enum DronePhysics {
     ODEPhysics,
 }
 
+#[derive(Default, Debug, Clone, PartialEq)]
+pub enum DroneFlightPhase {
+    #[default]
+    Idle,
+    TakeOff,
+    Landing,
+    InFlight,
+}
+
 #[derive(Component, Default, Debug, Clone)]
 pub struct DroneDescriptor {
     pub aerodynamic_props: AerodynamicsProperties,
@@ -29,7 +38,7 @@ pub struct DroneDescriptor {
     pub drone_physics: DronePhysics,
 
     pub thrust_commands: Vec<f32>,
-    pub uav_state: uav::dynamics::State,
+    pub uav_states: uav::dynamics::State,
 }
 
 #[derive(Default, Debug, Clone, Copy)]
