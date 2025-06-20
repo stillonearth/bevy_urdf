@@ -1,4 +1,4 @@
-use std::f32::consts::PI;
+use std::{collections::VecDeque, f32::consts::PI};
 
 use anyhow::Error;
 use bevy::prelude::*;
@@ -22,7 +22,7 @@ pub enum DronePhysics {
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
-pub enum DroneFlightPhase {
+pub enum FlightPhase {
     #[default]
     Idle,
     TakeOff,
@@ -36,9 +36,23 @@ pub struct DroneDescriptor {
     pub dynamics_model_props: DynamicsModelProperties,
     pub visual_body_properties: VisualBodyProperties,
     pub drone_physics: DronePhysics,
-
     pub thrust_commands: Vec<f32>,
-    pub uav_states: uav::dynamics::State,
+    pub uav_state: uav::dynamics::State,
+    pub(crate) state_log: VecDeque<uav::dynamics::State>,
+    pub(crate) flight_phase: FlightPhase,
+}
+
+impl DroneDescriptor {
+    fn set_uav_state(&mut self, new_state: uav::dynamics::State) {
+        self.uav_state = new_state.clone();
+        // make configurable
+        if self.state_log.len() >= 30 {
+            // persist state for 0.5 second
+            self.state_log.pop_front();
+        }
+
+        self.state_log.push_back(new_state);
+    }
 }
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -224,6 +238,46 @@ pub(crate) fn handle_control_thrusts(
     }
 }
 
+pub(crate) fn switch_drone_physics(
+    mut q_urdf_robots: Query<(Entity, &Transform, &mut DroneDescriptor)>,
+) {
+    for (_, _, mut drone) in q_urdf_robots.iter_mut() {
+        if drone.state_log.len() == 0 {
+            continue;
+        }
+
+        let last_state = drone.state_log.iter().last().unwrap();
+        let first_state = drone.state_log.iter().next().unwrap();
+
+        let delta_altitude = last_state.position_z - first_state.position_z;
+
+        // determine flight phase
+        match drone.flight_phase {
+            FlightPhase::Idle => {
+                if delta_altitude > 0.0 {
+                    drone.flight_phase = FlightPhase::TakeOff;
+                }
+            }
+            FlightPhase::TakeOff => {
+                // has taken off 10cm
+                if delta_altitude > 0.1 {
+                    drone.flight_phase = FlightPhase::InFlight;
+                }
+            }
+            _ => {}
+        }
+
+        match drone.drone_physics {
+            DronePhysics::RapierPhysics => {
+                if drone.flight_phase == FlightPhase::InFlight {
+                    drone.drone_physics = DronePhysics::ODEPhysics;
+                }
+            }
+            DronePhysics::ODEPhysics => {}
+        }
+    }
+}
+
 pub(crate) fn simulate_drone(
     mut q_drones: Query<(Entity, &URDFRobot, &mut DroneDescriptor)>,
     mut q_rapier_context: Query<(
@@ -302,6 +356,8 @@ pub(crate) fn simulate_drone(
                             root_body.set_rotation(quat_fix * quat, false);
                         }
 
+                        drone.set_uav_state(new_state);
+
                         ew_uav_state_update.write(UAVStateUpdate {
                             handle: urdf_robot.handle.clone(),
                             drone_state: new_state,
@@ -336,26 +392,26 @@ pub(crate) fn simulate_drone(
                     let torques = rotation * vector![torques[0], torques[1], torques[2]];
 
                     root_body.add_force(forces, true);
-
                     root_body.add_torque(torques, true);
 
                     // sync drone state
-                    drone.uav_state.position_x = position.x as f64;
-                    drone.uav_state.position_y = position.z as f64;
-                    drone.uav_state.position_z = position.y as f64;
-                    drone.uav_state.velocity_x = velocity.x as f64;
-                    drone.uav_state.velocity_y = velocity.z as f64;
-                    drone.uav_state.velocity_z = velocity.y as f64;
-                    drone.uav_state.roll = euler_angles_transformed.0 as f64;
-                    drone.uav_state.pitch = euler_angles_transformed.1 as f64;
-                    drone.uav_state.yaw = euler_angles_transformed.2 as f64;
-                    drone.uav_state.roll_rate = omega_transformed.x as f64;
-                    drone.uav_state.pitch_rate = omega_transformed.y as f64;
-                    drone.uav_state.yaw_rate = omega_transformed.z as f64;
+                    let new_state = uav::dynamics::State {
+                        position_x: position.x as f64,
+                        position_y: position.z as f64,
+                        position_z: position.y as f64,
+                        velocity_x: velocity.x as f64,
+                        velocity_y: velocity.z as f64,
+                        velocity_z: velocity.y as f64,
+                        roll: euler_angles_transformed.0 as f64,
+                        pitch: euler_angles_transformed.1 as f64,
+                        yaw: euler_angles_transformed.2 as f64,
+                        roll_rate: omega_transformed.x as f64,
+                        pitch_rate: omega_transformed.y as f64,
+                        yaw_rate: omega_transformed.z as f64,
+                    };
+                    drone.set_uav_state(new_state);
                 }
             }
-
-            println!("{:?}", drone.uav_state);
         }
     }
 }
@@ -390,7 +446,7 @@ fn multirotor_dynamics(
 
         // Torque from rotor drag
         // Assuming alternating rotor directions: even indices CW, odd indices CCW
-        let rotor_direction = if i % 2 == 0 { 1.0 } else { -1.0 };
+        let rotor_direction = if i % 2 == 0 { -1.0 } else { 1.0 };
         let torque_from_drag = f_direction * (torque_to_thrust_ratio * thrust * rotor_direction);
         total_torque_from_drag += torque_from_drag;
     }

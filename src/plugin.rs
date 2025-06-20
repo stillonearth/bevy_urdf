@@ -7,7 +7,7 @@ use rapier3d_urdf::UrdfRobotHandles;
 use urdf_rs::{Geometry, Pose};
 
 use crate::{
-    drones::{handle_control_thrusts, simulate_drone, ControlThrusts},
+    drones::{handle_control_thrusts, simulate_drone, switch_drone_physics, ControlThrusts},
     events::{
         handle_control_motors, handle_despawn_robot, handle_load_robot, handle_spawn_robot,
         handle_wait_robot_loaded, ControlMotors, DespawnRobot, LoadRobot, RobotLoaded,
@@ -93,6 +93,7 @@ impl Plugin for UrdfPlugin {
                 (
                     handle_control_motors,
                     handle_control_thrusts,
+                    switch_drone_physics,
                     handle_despawn_robot,
                     handle_load_robot,
                     handle_spawn_robot,

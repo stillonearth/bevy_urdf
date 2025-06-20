@@ -257,20 +257,6 @@ pub(crate) fn handle_spawn_robot(
                     {
                         if let Some(rigid_body) = rigid_body_set.bodies.get_mut(body_handles[index])
                         {
-                            // make robot a kinematic body if we're simulating a drone
-                            // assume root body index is 0
-                            // if event.robot_type == RobotType::Drone
-                            //     && index
-                            //         == drone_descriptor
-                            //             .clone()
-                            //             .unwrap()
-                            //             .visual_body_properties
-                            //             .root_body_index
-                            // {
-                            //     rigid_body
-                            //         .set_body_type(RigidBodyType::KinematicPositionBased, false);
-                            // }
-
                             let collider_handles = rigid_body.colliders();
                             for collider_handle in collider_handles.iter() {
                                 let collider =
