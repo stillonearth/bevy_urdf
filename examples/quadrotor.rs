@@ -48,7 +48,6 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            UrdfPlugin,
             StlPlugin,
             ObjPlugin,
             FlyCameraPlugin {
@@ -56,6 +55,7 @@ fn main() {
                 grab_cursor_on_startup: true,
             },
             RapierPhysicsPlugin::<NoUserData>::default(),
+            UrdfPlugin::default().with_default_system_setup(true),
             EguiPlugin {
                 enable_multipass_for_primary_context: true,
             },

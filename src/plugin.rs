@@ -1,7 +1,17 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, marker::PhantomData, str::FromStr};
 
-use bevy::prelude::*;
-use bevy_rapier3d::prelude::{RapierContextJoints, RapierRigidBodySet};
+use bevy::{
+    ecs::{
+        intern::Interned,
+        schedule::{ScheduleConfigs, ScheduleLabel},
+        system::{ScheduleSystem, SystemParamItem},
+    },
+    prelude::*,
+};
+use bevy_rapier3d::{
+    plugin::{NoUserData, PhysicsSet},
+    prelude::{BevyPhysicsHooks, RapierContextJoints, RapierRigidBodySet},
+};
 use rapier3d::prelude::{Collider, MultibodyJointHandle, RigidBodyHandle};
 use rapier3d_urdf::UrdfRobotHandles;
 use urdf_rs::{Geometry, Pose};
@@ -15,7 +25,86 @@ use crate::{
     },
     urdf_asset_loader::{self, UrdfAsset},
 };
-pub struct UrdfPlugin;
+pub struct UrdfPlugin<PhysicsHooks = ()> {
+    default_system_setup: bool,
+    schedule: Interned<dyn ScheduleLabel>,
+    _phantom: PhantomData<PhysicsHooks>,
+}
+
+impl<PhysicsHooks> UrdfPlugin<PhysicsHooks>
+where
+    PhysicsHooks: 'static + BevyPhysicsHooks,
+    for<'w, 's> SystemParamItem<'w, 's, PhysicsHooks>: BevyPhysicsHooks,
+{
+    pub fn with_default_system_setup(mut self, default_system_setup: bool) -> Self {
+        self.default_system_setup = default_system_setup;
+        self
+    }
+
+    /// Provided for use when staging systems outside of this plugin using
+    /// [`with_default_system_setup(false)`](Self::with_default_system_setup).
+    pub fn get_systems(set: PhysicsSet) -> ScheduleConfigs<ScheduleSystem> {
+        match set {
+            PhysicsSet::StepSimulation => (simulate_drone, switch_drone_physics)
+                .in_set(PhysicsSet::StepSimulation)
+                .into_configs(),
+            PhysicsSet::SyncBackend => (
+                handle_control_motors,
+                handle_control_thrusts,
+                handle_despawn_robot,
+                handle_load_robot,
+                handle_spawn_robot,
+                handle_wait_robot_loaded,
+                read_sensors,
+            )
+                .into_configs(),
+            PhysicsSet::Writeback => (sync_robot_geometry, adjust_urdf_robot_mean_position)
+                .in_set(PhysicsSet::Writeback)
+                .into_configs(),
+        }
+    }
+}
+
+impl<PhysicsHooksSystemParam> Default for UrdfPlugin<PhysicsHooksSystemParam> {
+    fn default() -> Self {
+        Self {
+            schedule: PostUpdate.intern(),
+            default_system_setup: true,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl Plugin for UrdfPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_asset_loader::<urdf_asset_loader::RpyAssetLoader>()
+            .add_event::<ControlMotors>()
+            .add_event::<ControlThrusts>()
+            .add_event::<DespawnRobot>()
+            .add_event::<LoadRobot>()
+            .add_event::<RobotLoaded>()
+            .add_event::<RobotSpawned>()
+            .add_event::<SensorsRead>()
+            .add_event::<UAVStateUpdate>()
+            .add_event::<SpawnRobot>()
+            .add_event::<WaitRobotLoaded>()
+            .init_asset::<urdf_asset_loader::UrdfAsset>();
+
+        if self.default_system_setup {
+            app.add_systems(
+                self.schedule,
+                (
+                    UrdfPlugin::<NoUserData>::get_systems(PhysicsSet::SyncBackend)
+                        .in_set(PhysicsSet::SyncBackend),
+                    UrdfPlugin::<NoUserData>::get_systems(PhysicsSet::StepSimulation)
+                        .in_set(PhysicsSet::StepSimulation),
+                    UrdfPlugin::<NoUserData>::get_systems(PhysicsSet::Writeback)
+                        .in_set(PhysicsSet::Writeback),
+                ),
+            );
+        }
+    }
+}
 
 // Components
 
@@ -65,46 +154,6 @@ pub struct URDFRobotRigidBodyHandle(pub RigidBodyHandle);
 pub struct VisualPositionShift(pub Vec3);
 
 // Plugin
-
-impl Plugin for UrdfPlugin {
-    fn build(&self, app: &mut App) {
-        app.init_asset_loader::<urdf_asset_loader::RpyAssetLoader>()
-            .add_event::<ControlMotors>()
-            .add_event::<ControlThrusts>()
-            .add_event::<DespawnRobot>()
-            .add_event::<LoadRobot>()
-            .add_event::<RobotLoaded>()
-            .add_event::<RobotSpawned>()
-            .add_event::<SensorsRead>()
-            .add_event::<UAVStateUpdate>()
-            .add_event::<SpawnRobot>()
-            .add_event::<WaitRobotLoaded>()
-            .add_systems(
-                Update,
-                (
-                    simulate_drone,
-                    sync_robot_geometry,
-                    adjust_urdf_robot_mean_position,
-                )
-                    .chain(),
-            )
-            .add_systems(
-                Update,
-                (
-                    handle_control_motors,
-                    handle_control_thrusts,
-                    switch_drone_physics,
-                    handle_despawn_robot,
-                    handle_load_robot,
-                    handle_spawn_robot,
-                    handle_wait_robot_loaded,
-                    read_sensors,
-                )
-                    .chain(),
-            )
-            .init_asset::<urdf_asset_loader::UrdfAsset>();
-    }
-}
 
 pub fn extract_robot_geometry(
     robot: &UrdfAsset,
