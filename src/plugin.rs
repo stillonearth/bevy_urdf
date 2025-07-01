@@ -1,4 +1,4 @@
-use std::{collections::HashMap, marker::PhantomData, str::FromStr};
+use std::{collections::HashMap, f32::consts::PI, marker::PhantomData, str::FromStr};
 
 use bevy::{
     ecs::{
@@ -12,12 +12,16 @@ use bevy_rapier3d::{
     plugin::{NoUserData, PhysicsSet},
     prelude::{BevyPhysicsHooks, RapierContextJoints, RapierRigidBodySet},
 };
+use nalgebra::{Isometry3, Rotation3, UnitQuaternion, Vector3};
 use rapier3d::prelude::{Collider, MultibodyJointHandle, RigidBodyHandle};
 use rapier3d_urdf::UrdfRobotHandles;
 use urdf_rs::{Geometry, Pose};
 
 use crate::{
-    drones::{handle_control_thrusts, simulate_drone, switch_drone_physics, ControlThrusts},
+    drones::{
+        handle_control_thrusts, simulate_drone, switch_drone_physics, ControlThrusts,
+        DroneDescriptor, DronePhysics, FlightPhase,
+    },
     events::{
         handle_control_motors, handle_despawn_robot, handle_load_robot, handle_spawn_robot,
         handle_wait_robot_loaded, ControlMotors, DespawnRobot, LoadRobot, RobotLoaded,
@@ -45,7 +49,7 @@ where
     /// [`with_default_system_setup(false)`](Self::with_default_system_setup).
     pub fn get_systems(set: PhysicsSet) -> ScheduleConfigs<ScheduleSystem> {
         match set {
-            PhysicsSet::StepSimulation => (simulate_drone, switch_drone_physics)
+            PhysicsSet::StepSimulation => ((switch_drone_physics, simulate_drone).chain())
                 .in_set(PhysicsSet::StepSimulation)
                 .into_configs(),
             PhysicsSet::SyncBackend => (
@@ -58,9 +62,10 @@ where
                 read_sensors,
             )
                 .into_configs(),
-            PhysicsSet::Writeback => (sync_robot_geometry, adjust_urdf_robot_mean_position)
-                .in_set(PhysicsSet::Writeback)
-                .into_configs(),
+            PhysicsSet::Writeback => ((sync_robot_geometry, adjust_urdf_robot_mean_position)
+                .chain())
+            .in_set(PhysicsSet::Writeback)
+            .into_configs(),
         }
     }
 }
@@ -214,7 +219,7 @@ fn sync_robot_geometry(
     q_rapier_rigid_body_set: Query<(&RapierRigidBodySet,)>,
 ) {
     for rapier_rigid_body_set in q_rapier_rigid_body_set.iter() {
-        for (j, (_, mut transform, body_handle, shift)) in
+        for (_j, (_, mut transform, body_handle, _shift)) in
             q_rapier_robot_bodies.iter_mut().enumerate()
         {
             if let Some(robot_body) = rapier_rigid_body_set.0.bodies.get(body_handle.0) {
@@ -233,7 +238,9 @@ fn sync_robot_geometry(
                 );
 
                 let bevy_vec = quat_fix.mul_vec3(rapier_vec);
-                *transform = Transform::from_translation(bevy_vec).with_rotation(bevy_quat);
+                let body_transform = Transform::from_translation(bevy_vec).with_rotation(bevy_quat);
+
+                *transform = body_transform;
             }
         }
     }
@@ -244,60 +251,57 @@ fn adjust_urdf_robot_mean_position(
     mut q_rapier_robot_bodies: Query<(Entity, &URDFRobotRigidBodyHandle, &mut Transform, &ChildOf)>,
     mut q_urdf_robots: Query<
         (Entity, &mut Transform, &URDFRobot),
-        Without<URDFRobotRigidBodyHandle>,
+        (Without<URDFRobotRigidBodyHandle>),
     >,
 ) {
     let mut robot_parts: HashMap<Handle<UrdfAsset>, Vec<Transform>> = HashMap::new();
-    for (_, _, transform, child_od) in q_rapier_robot_bodies.iter() {
-        let urdf_robot_result = q_urdf_robots
-            .get(child_od.parent())
-            .map(|(_, _, urdf)| urdf.handle.clone());
 
-        if urdf_robot_result.is_ok() {
-            robot_parts
-                .entry(urdf_robot_result.unwrap())
-                .or_default()
-                .push(*transform);
+    // Collect all transforms for each robot
+    for (_, _, transform, child_of) in q_rapier_robot_bodies.iter() {
+        let urdf_robot_result = q_urdf_robots
+            .get(child_of.parent())
+            .map(|(_, _, urdf)| urdf.handle.clone());
+        if let Ok(handle) = urdf_robot_result {
+            robot_parts.entry(handle).or_default().push(*transform);
         }
     }
 
     let quat_fix =
         Quat::from_rotation_z(std::f32::consts::PI) * Quat::from_rotation_y(std::f32::consts::PI);
-
     let mut mean_translations: HashMap<Handle<UrdfAsset>, Vec3> = HashMap::new();
 
-    // calculate mean transfrom for each URDF asset
+    // Calculate mean translation for each URDF asset
     for (urdf_handle, transforms) in robot_parts.iter() {
+        if transforms.is_empty() {
+            continue;
+        }
+
         let mut mean_translation = Vec3::ZERO;
         for transform in transforms {
             mean_translation += transform.translation;
         }
-
         mean_translation /= transforms.len() as f32;
-        mean_translation = quat_fix.mul_vec3(mean_translation);
 
-        mean_translations
-            .entry(urdf_handle.clone())
-            .or_insert(mean_translation);
+        // Apply coordinate system fix to the mean translation
+        mean_translation = quat_fix.mul_vec3(mean_translation);
+        mean_translations.insert(urdf_handle.clone(), mean_translation);
     }
 
-    // set urdf_robots translation to mean transform
+    // Set urdf_robots translation to mean translation
     for (_, mut transform, urdf_robot) in q_urdf_robots.iter_mut() {
-        if let Some(mean_translation) = mean_translations.get(&urdf_robot.handle.clone()) {
+        if let Some(mean_translation) = mean_translations.get(&urdf_robot.handle) {
             transform.translation = *mean_translation;
         }
     }
 
-    // subtract mean translation from each URDF asset
+    // Adjust child body transforms relative to the new parent position
     for (_, _, mut transform, child_of) in q_rapier_robot_bodies.iter_mut() {
-        let parent = q_urdf_robots.get(child_of.parent());
-        if parent.is_err() {
-            continue;
-        }
-        let handle = parent.unwrap().2.handle.clone();
-        if let Some(mean_translation) = mean_translations.get(&handle) {
-            let transform_fix = quat_fix.mul_vec3(*mean_translation);
-            transform.translation -= transform_fix;
+        if let Ok((_, _, urdf_robot)) = q_urdf_robots.get(child_of.parent()) {
+            if let Some(mean_translation) = mean_translations.get(&urdf_robot.handle) {
+                // Convert mean translation back to world space for subtraction
+                let world_mean_translation = quat_fix.mul_vec3(*mean_translation);
+                transform.translation -= world_mean_translation;
+            }
         }
     }
 }

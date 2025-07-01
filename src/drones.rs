@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, f32::consts::PI};
 
 use anyhow::Error;
-use bevy::prelude::*;
+use bevy::{prelude::*, transform};
 use bevy_rapier3d::{
     plugin::RapierConfiguration,
     prelude::{
@@ -279,7 +279,7 @@ pub(crate) fn switch_drone_physics(
 }
 
 pub(crate) fn simulate_drone(
-    mut q_drones: Query<(Entity, &URDFRobot, &mut DroneDescriptor)>,
+    mut q_drones: Query<(Entity, &mut Transform, &URDFRobot, &mut DroneDescriptor)>,
     mut q_rapier_context: Query<(
         Entity,
         &mut RapierConfiguration,
@@ -300,7 +300,7 @@ pub(crate) fn simulate_drone(
         let start_time = 0.0;
         let end_time = rapier_simulation.integration_parameters.dt as f64;
 
-        for (_, urdf_robot, mut drone) in q_drones.iter_mut() {
+        for (_, mut transform, urdf_robot, mut drone) in q_drones.iter_mut() {
             let consts = uav::dynamics::Consts {
                 g: rapier_configuration.gravity.length() as f64,
                 mass: drone.dynamics_model_props.mass as f64,
