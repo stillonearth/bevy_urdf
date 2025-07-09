@@ -24,7 +24,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            UrdfPlugin,
+            UrdfPlugin::default(),
             StlPlugin,
             FlyCameraPlugin {
                 spawn_camera: true,

@@ -120,7 +120,7 @@ fn control_thrusts(
         for (_, drone_descriptor) in q_drone.iter() {
             let uav_state: uav::dynamics::State = drone_descriptor.uav_state;
 
-            let t_pos = Vector3::new(-5., 3., 10.);
+            let t_pos = Vector3::new(3.0, 3.0, 3.0);
             let t_vel = Vector3::new(0.0, 0.0, 0.0);
             let t_acc = Vector3::new(0.0, 0.0, 0.0);
             let t_att = UnitQuaternion::identity();

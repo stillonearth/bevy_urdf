@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, f32::consts::PI};
 
 use anyhow::Error;
-use bevy::{prelude::*, transform};
+use bevy::prelude::*;
 use bevy_rapier3d::{
     plugin::RapierConfiguration,
     prelude::{
@@ -42,9 +42,16 @@ pub struct DroneDescriptor {
     pub(crate) flight_phase: FlightPhase,
 }
 
+#[derive(Component)]
+pub struct DroneRotor {
+    pub state: uav::dynamics::RotorState,
+    pub transform: Transform,
+    pub rotor_index: usize,
+}
+
 impl DroneDescriptor {
     fn set_uav_state(&mut self, new_state: uav::dynamics::State) {
-        self.uav_state = new_state.clone();
+        self.uav_state = new_state;
         // make configurable
         if self.state_log.len() >= 30 {
             // persist state for 0.5 second
@@ -79,10 +86,17 @@ pub struct DynamicsModelProperties {
     pub rotor_positions: Vec<Vec3>,
 }
 
+impl DynamicsModelProperties {
+    pub fn n_rotors(&self) -> usize {
+        self.rotor_positions.len()
+    }
+}
+
 #[derive(Default, Debug, Clone)]
 pub struct VisualBodyProperties {
     pub root_body_index: usize,
     pub rotor_body_indices: Vec<usize>,
+    pub rotor_positions: Vec<Vec3>,
 }
 
 #[derive(Event)]
@@ -217,6 +231,15 @@ pub fn try_extract_drone_visual_and_dynamics_model_properties(
                 prop_origin[1] as f32,
                 prop_origin[2] as f32,
             ));
+
+            for visual in link.visual.iter() {
+                let prop_visual = visual.origin.xyz.0;
+                visual_body_props.rotor_positions.push(Vec3::new(
+                    prop_visual[0] as f32,
+                    prop_visual[1] as f32,
+                    prop_visual[2] as f32,
+                ));
+            }
         }
     }
 
@@ -242,7 +265,7 @@ pub(crate) fn switch_drone_physics(
     mut q_urdf_robots: Query<(Entity, &Transform, &mut DroneDescriptor)>,
 ) {
     for (_, _, mut drone) in q_urdf_robots.iter_mut() {
-        if drone.state_log.len() == 0 {
+        if drone.state_log.is_empty() {
             continue;
         }
 
@@ -280,6 +303,7 @@ pub(crate) fn switch_drone_physics(
 
 pub(crate) fn simulate_drone(
     mut q_drones: Query<(Entity, &mut Transform, &URDFRobot, &mut DroneDescriptor)>,
+    mut q_drone_rotors: Query<(Entity, &ChildOf, &mut DroneRotor)>,
     mut q_rapier_context: Query<(
         Entity,
         &mut RapierConfiguration,
@@ -300,7 +324,7 @@ pub(crate) fn simulate_drone(
         let start_time = 0.0;
         let end_time = rapier_simulation.integration_parameters.dt as f64;
 
-        for (_, mut transform, urdf_robot, mut drone) in q_drones.iter_mut() {
+        for (parent_entity, _transform, urdf_robot, mut drone) in q_drones.iter_mut() {
             let consts = uav::dynamics::Consts {
                 g: rapier_configuration.gravity.length() as f64,
                 mass: drone.dynamics_model_props.mass as f64,
@@ -309,13 +333,29 @@ pub(crate) fn simulate_drone(
                 izz: drone.dynamics_model_props.izz as f64,
             };
 
-            if drone.thrust_commands.len() == 0 {
+            if drone.thrust_commands.is_empty() {
                 continue;
+            }
+
+            let mut output_thusts: Vec<f32> = Vec::new();
+            for (index, thrust_command) in drone.thrust_commands.iter().enumerate() {
+                for (_, child_of, mut drone_rotor) in q_drone_rotors.iter_mut() {
+                    if !(child_of.parent() == parent_entity && drone_rotor.rotor_index == index) {
+                        continue;
+                    }
+
+                    drone_rotor
+                        .state
+                        .update(rapier_simulation.integration_parameters.dt, *thrust_command);
+
+                    output_thusts.push(drone_rotor.state.current_thrust);
+                    break;
+                }
             }
 
             // let (forces, torques) = quadrotor_dynamics(thrusts, drone.aerodynamic_props);
             let (forces, torques) = multirotor_dynamics(
-                &drone.thrust_commands,
+                &output_thusts,
                 &drone.aerodynamic_props,
                 &drone.dynamics_model_props,
             );
@@ -422,7 +462,7 @@ fn multirotor_dynamics(
     dynamics_props: &DynamicsModelProperties,
 ) -> ([f32; 3], [f32; 3]) {
     // Ensure we have the same number of thrusts as rotors
-    assert_eq!(thrusts.len(), dynamics_props.rotor_positions.len());
+    assert_eq!(thrusts.len(), dynamics_props.n_rotors());
 
     let torque_to_thrust_ratio = aerodynamics_props.km / aerodynamics_props.kf;
     let f_direction = vector![0.0, 0.0, 1.0];
@@ -458,4 +498,27 @@ fn multirotor_dynamics(
         [total_force.x, total_force.y, total_force.z],
         [total_torque.x, total_torque.y, total_torque.z],
     )
+}
+
+pub(crate) fn render_drone_rotors(
+    mut q_rotors: Query<(Entity, &ChildOf, &mut Transform, &DroneRotor)>,
+    mut q_bodies: Query<(Entity, &ChildOf, &mut Transform), Without<DroneRotor>>,
+) {
+    let quat_fix = Quat::from_rotation_x(std::f32::consts::PI / 2.0);
+    for (_, child_of, mut transform, rotor) in q_rotors.iter_mut() {
+        let parent_entity = child_of.parent();
+        if let Some((_, _, root_transform)) = q_bodies
+            .iter()
+            .find(|(_, child_of, _)| child_of.parent() == parent_entity)
+        {
+            let rotor_direction = if rotor.rotor_index % 2 == 0 {
+                -1.0
+            } else {
+                1.0
+            };
+            transform.translation += root_transform.rotation * rotor.transform.translation;
+            transform.rotation =
+                quat_fix * Quat::from_rotation_z(rotor_direction * rotor.state.current_angle);
+        }
+    }
 }

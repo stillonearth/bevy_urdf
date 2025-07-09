@@ -12,7 +12,7 @@ anyhow = "1.0"
 bevy = { version = "0.16", default-features = false, features = ["bevy_asset"] }
 rapier3d-urdf = { version = "0.6.0", features = ["stl", "wavefront"] }
 rapier3d = { version = "0.25", features = ["serde-serialize"] }
-bevy_rapier3d = { version="0.30", features = [
+bevy_rapier3d = { version = "0.30", features = [
     "simd-stable",
     "serde-serialize",
 ] }
@@ -26,7 +26,7 @@ rand = "0.9"
 nalgebra = "0.33"
 csv = "1.3.1"
 uom = "0.37"
-uav = "0.1.1"
+uav = { version = "0.1.2" }
 roxmltree = "0.20"
 queues = "1.0.2"
 
@@ -41,7 +41,7 @@ bevy = { version = "0.16", default-features = false, features = [
     "tonemapping_luts",
     "x11",
 ] }
-bevy_flycam = { git = "https://github.com/kSDOT/bevy_flycam.git", rev="a6f36a"}
+bevy_flycam = { git = "https://github.com/kSDOT/bevy_flycam.git", rev = "a6f36a" }
 bevy-inspector-egui = "0.31"
 actix-web = "4.4"
 tokio = { version = "1.0", features = ["full"] }

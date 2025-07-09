@@ -1,4 +1,4 @@
-use std::{collections::HashMap, f32::consts::PI, marker::PhantomData, str::FromStr};
+use std::{collections::HashMap, marker::PhantomData, str::FromStr};
 
 use bevy::{
     ecs::{
@@ -12,15 +12,14 @@ use bevy_rapier3d::{
     plugin::{NoUserData, PhysicsSet},
     prelude::{BevyPhysicsHooks, RapierContextJoints, RapierRigidBodySet},
 };
-use nalgebra::{Isometry3, Rotation3, UnitQuaternion, Vector3};
 use rapier3d::prelude::{Collider, MultibodyJointHandle, RigidBodyHandle};
 use rapier3d_urdf::UrdfRobotHandles;
 use urdf_rs::{Geometry, Pose};
 
 use crate::{
     drones::{
-        handle_control_thrusts, simulate_drone, switch_drone_physics, ControlThrusts,
-        DroneDescriptor, DronePhysics, FlightPhase,
+        handle_control_thrusts, render_drone_rotors, simulate_drone, switch_drone_physics,
+        ControlThrusts,
     },
     events::{
         handle_control_motors, handle_despawn_robot, handle_load_robot, handle_spawn_robot,
@@ -62,7 +61,11 @@ where
                 read_sensors,
             )
                 .into_configs(),
-            PhysicsSet::Writeback => ((sync_robot_geometry, adjust_urdf_robot_mean_position)
+            PhysicsSet::Writeback => ((
+                sync_robot_geometry,
+                render_drone_rotors,
+                adjust_urdf_robot_mean_position,
+            )
                 .chain())
             .in_set(PhysicsSet::Writeback)
             .into_configs(),
@@ -155,11 +158,9 @@ impl From<&str> for RobotType {
 #[derive(Component, Default, Deref)]
 pub struct URDFRobotRigidBodyHandle(pub RigidBodyHandle);
 
-#[derive(Component, Default, Deref)]
-pub struct VisualPositionShift(pub Vec3);
-
 // Plugin
 
+#[allow(clippy::type_complexity)]
 pub fn extract_robot_geometry(
     robot: &UrdfAsset,
 ) -> Vec<(
@@ -210,18 +211,11 @@ pub fn extract_robot_geometry(
 }
 
 fn sync_robot_geometry(
-    mut q_rapier_robot_bodies: Query<(
-        Entity,
-        &mut Transform,
-        &mut URDFRobotRigidBodyHandle,
-        &VisualPositionShift,
-    )>,
+    mut q_rapier_robot_bodies: Query<(Entity, &mut Transform, &mut URDFRobotRigidBodyHandle)>,
     q_rapier_rigid_body_set: Query<(&RapierRigidBodySet,)>,
 ) {
     for rapier_rigid_body_set in q_rapier_rigid_body_set.iter() {
-        for (_j, (_, mut transform, body_handle, _shift)) in
-            q_rapier_robot_bodies.iter_mut().enumerate()
-        {
+        for (_, mut transform, body_handle) in q_rapier_robot_bodies.iter_mut() {
             if let Some(robot_body) = rapier_rigid_body_set.0.bodies.get(body_handle.0) {
                 let rapier_pos = robot_body.position();
                 let rapier_rot = rapier_pos.rotation;
@@ -251,7 +245,7 @@ fn adjust_urdf_robot_mean_position(
     mut q_rapier_robot_bodies: Query<(Entity, &URDFRobotRigidBodyHandle, &mut Transform, &ChildOf)>,
     mut q_urdf_robots: Query<
         (Entity, &mut Transform, &URDFRobot),
-        (Without<URDFRobotRigidBodyHandle>),
+        Without<URDFRobotRigidBodyHandle>,
     >,
 ) {
     let mut robot_parts: HashMap<Handle<UrdfAsset>, Vec<Transform>> = HashMap::new();

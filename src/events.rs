@@ -4,15 +4,16 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use rapier3d::prelude::{InteractionGroups, MultibodyJointHandle, RigidBodyHandle};
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobotHandles};
+use uav::dynamics::RotorState;
 
 use crate::{
     drones::{
         try_extract_drone_aerodynamics_properties,
-        try_extract_drone_visual_and_dynamics_model_properties, DroneDescriptor,
+        try_extract_drone_visual_and_dynamics_model_properties, DroneDescriptor, DroneRotor,
     },
     plugin::{extract_robot_geometry, URDFRobot, URDFRobotRigidBodyHandle},
     urdf_asset_loader::{RpyAssetLoaderSettings, UrdfAsset},
-    RobotType, VisualPositionShift,
+    RobotType,
 };
 
 #[derive(Component)]
@@ -93,6 +94,7 @@ pub struct ControlMotors {
     pub velocities: Vec<f32>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn handle_spawn_robot(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -186,14 +188,10 @@ pub(crate) fn handle_spawn_robot(
                 InheritedVisibility::VISIBLE,
             ))
             .with_children(|children| {
+                let mut rotor_index = 0;
                 for (index, geom, _, _visual_pose, _collider) in geoms {
                     if geom.is_none() {
                         continue;
-                    }
-
-                    // don't insert rotors for now
-                    if event.robot_type == RobotType::Drone && index > 0 {
-                        break;
                     }
 
                     let mesh_3d: Mesh3d = match geom.unwrap() {
@@ -218,7 +216,6 @@ pub(crate) fn handle_spawn_robot(
 
                     let rapier_link = urdf.urdf_robot.links[index].clone();
                     let rapier_pos = rapier_link.body.position();
-                    let visual_position_shift = Vec3::ZERO;
 
                     let rapier_rot = rapier_pos.rotation;
 
@@ -238,17 +235,52 @@ pub(crate) fn handle_spawn_robot(
                     );
                     let bevy_vec = quat_fix.mul_vec3(rapier_vec);
 
-                    let transform = Transform::from_translation(bevy_vec + visual_position_shift)
-                        .with_rotation(bevy_quat);
-
-                    let ec = children.spawn((
+                    let mut ec = children.spawn((
                         mesh_3d,
-                        MeshMaterial3d(materials.add(Color::srgb(0.3, 0.4, 0.3))),
+                        MeshMaterial3d(materials.add(Color::srgb(0.2, 0.8, 0.2))),
                         URDFRobotRigidBodyHandle(body_handles[index]),
                         RapierContextEntityLink(rapier_context_simulation_entity),
-                        VisualPositionShift(visual_position_shift),
-                        transform,
                     ));
+
+                    if let Some(drone_descriptor) = drone_descriptor.clone() {
+                        let adp = drone_descriptor.aerodynamic_props;
+                        let vbp = drone_descriptor.visual_body_properties;
+                        let dmp = drone_descriptor.dynamics_model_props;
+
+                        if vbp.rotor_body_indices.contains(&index) {
+                            let max_thrust = adp.thrust2weight * dmp.mass * 9.81;
+
+                            let rotor_state = RotorState::new(
+                                // todo: get 9.81 from config
+                                max_thrust,
+                                max_thrust * 2.0,
+                                adp.kf,
+                                adp.km,
+                            );
+
+                            let transform = if let Some(visual_rotor_position) =
+                                vbp.rotor_positions.get(rotor_index)
+                            {
+                                Transform::from_translation(*visual_rotor_position)
+                                    .with_rotation(bevy_quat)
+                            } else {
+                                Transform::from_translation(bevy_vec).with_rotation(bevy_quat)
+                            };
+
+                            ec.insert(DroneRotor {
+                                state: rotor_state,
+                                transform: transform,
+                                rotor_index,
+                            });
+                            rotor_index += 1;
+
+                            ec.insert(transform);
+                        }
+                    } else {
+                        let transform =
+                            Transform::from_translation(bevy_vec).with_rotation(bevy_quat);
+                        ec.insert(transform);
+                    }
 
                     // insert entity id to collider data, otherwise it breaks in debug mode
                     let entity_id = ec.id().index();
