@@ -100,6 +100,18 @@ pub struct ControlMotors {
     pub velocities: Vec<f32>,
 }
 
+#[derive(Event)]
+pub struct ControlThrusters {
+    pub handle: Handle<UrdfAsset>,
+    pub thrusts: Vec<f32>,
+}
+
+#[derive(Event)]
+pub struct ControlFins {
+    pub handle: Handle<UrdfAsset>,
+    pub angles: Vec<f32>,
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn handle_spawn_robot(
     mut commands: Commands,

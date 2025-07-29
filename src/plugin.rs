@@ -21,13 +21,14 @@ use crate::{
         handle_control_thrusts, render_drone_rotors, simulate_drone, switch_drone_physics,
         ControlThrusts,
     },
-    uuv::simulate_uuv,
     events::{
         handle_control_motors, handle_despawn_robot, handle_load_robot, handle_spawn_robot,
-        handle_wait_robot_loaded, ControlMotors, DespawnRobot, LoadRobot, RobotLoaded,
-        RobotSpawned, SensorsRead, SpawnRobot, UAVStateUpdate, UuvStateUpdate, WaitRobotLoaded,
+        handle_wait_robot_loaded, ControlFins, ControlMotors, ControlThrusters, DespawnRobot,
+        LoadRobot, RobotLoaded, RobotSpawned, SensorsRead, SpawnRobot, UAVStateUpdate,
+        UuvStateUpdate, WaitRobotLoaded,
     },
     urdf_asset_loader::{self, UrdfAsset},
+    uuv::{handle_control_fins, handle_control_thrusters, simulate_uuv},
 };
 pub struct UrdfPlugin<PhysicsHooks = ()> {
     default_system_setup: bool,
@@ -49,12 +50,15 @@ where
     /// [`with_default_system_setup(false)`](Self::with_default_system_setup).
     pub fn get_systems(set: PhysicsSet) -> ScheduleConfigs<ScheduleSystem> {
         match set {
-            PhysicsSet::StepSimulation => ((switch_drone_physics, simulate_drone, simulate_uuv).chain())
-                .in_set(PhysicsSet::StepSimulation)
-                .into_configs(),
+            PhysicsSet::StepSimulation => ((switch_drone_physics, simulate_drone, simulate_uuv)
+                .chain())
+            .in_set(PhysicsSet::StepSimulation)
+            .into_configs(),
             PhysicsSet::SyncBackend => (
                 handle_control_motors,
                 handle_control_thrusts,
+                handle_control_thrusters,
+                handle_control_fins,
                 handle_despawn_robot,
                 handle_load_robot,
                 handle_spawn_robot,
@@ -89,6 +93,8 @@ impl Plugin for UrdfPlugin {
         app.init_asset_loader::<urdf_asset_loader::RpyAssetLoader>()
             .add_event::<ControlMotors>()
             .add_event::<ControlThrusts>()
+            .add_event::<ControlThrusters>()
+            .add_event::<ControlFins>()
             .add_event::<DespawnRobot>()
             .add_event::<LoadRobot>()
             .add_event::<RobotLoaded>()
