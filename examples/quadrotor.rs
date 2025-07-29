@@ -1,3 +1,4 @@
+use bevy::input::{keyboard::KeyCode, ButtonInput};
 use bevy::{
     color::palettes::css::WHITE, input::common_conditions::input_toggle_active, prelude::*,
 };
@@ -8,7 +9,7 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_obj::ObjPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
-use bevy_urdf::RobotType;
+use bevy_urdf::{CameraControlPlugin, RobotType, RotateCamera};
 use nalgebra::{UnitQuaternion, Vector3};
 
 use bevy_urdf::drones::{ControlThrusts, DroneDescriptor};
@@ -61,6 +62,7 @@ fn main() {
             },
             InfiniteGridPlugin,
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
+            CameraControlPlugin,
         ))
         .init_state::<AppState>()
         .insert_resource(MovementSettings {
@@ -77,6 +79,7 @@ fn main() {
         .insert_resource(UrdfRobotHandle(None))
         .add_systems(Startup, setup)
         .add_systems(Update, control_thrusts)
+        .add_systems(Update, camera_angle_input)
         .add_systems(Update, start_simulation.run_if(in_state(AppState::Loading)))
         .run();
 }
@@ -209,4 +212,31 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
         drone_descriptor: None,
         uuv_descriptor: None,
     });
+}
+
+fn camera_angle_input(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut ew_rotate: EventWriter<RotateCamera>,
+) {
+    let mut delta_yaw = 0.0;
+    let mut delta_pitch = 0.0;
+    let step = 0.05;
+    if keyboard_input.pressed(KeyCode::ArrowLeft) {
+        delta_yaw += step;
+    }
+    if keyboard_input.pressed(KeyCode::ArrowRight) {
+        delta_yaw -= step;
+    }
+    if keyboard_input.pressed(KeyCode::ArrowUp) {
+        delta_pitch += step;
+    }
+    if keyboard_input.pressed(KeyCode::ArrowDown) {
+        delta_pitch -= step;
+    }
+    if delta_yaw != 0.0 || delta_pitch != 0.0 {
+        ew_rotate.send(RotateCamera {
+            delta_yaw,
+            delta_pitch,
+        });
+    }
 }

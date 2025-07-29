@@ -1,10 +1,8 @@
+use bevy::input::{keyboard::KeyCode, ButtonInput};
 use bevy::{
-    color::palettes::css::WHITE,
-    input::common_conditions::input_toggle_active,
-    prelude::*,
+    color::palettes::css::WHITE, input::common_conditions::input_toggle_active, prelude::*,
 };
 use bevy_flycam::prelude::*;
-use bevy_urdf::{MapConfig, MapTerrainPlugin};
 use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_obj::ObjPlugin;
@@ -13,6 +11,8 @@ use bevy_stl::StlPlugin;
 use bevy_urdf::events::{ControlThrusters, LoadRobot, RapierOption, RobotLoaded, SpawnRobot};
 use bevy_urdf::plugin::{RobotType, UrdfPlugin};
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
+use bevy_urdf::{CameraControlPlugin, RotateCamera};
+use bevy_urdf::{MapConfig, MapTerrainPlugin};
 
 fn main() {
     App::new()
@@ -42,9 +42,12 @@ fn main() {
                 z_layer: 0.0,
             }),
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
+            CameraControlPlugin,
         ))
         .init_state::<AppState>()
-        .insert_resource(MovementSettings { move_speed: Vec3::ONE * 3.0 })
+        .insert_resource(MovementSettings {
+            move_speed: Vec3::ONE * 3.0,
+        })
         .insert_resource(MouseSettings {
             invert_horizontal: false,
             invert_vertical: false,
@@ -55,6 +58,7 @@ fn main() {
         .insert_resource(UrdfRobotHandle(None))
         .add_systems(Startup, setup)
         .add_systems(Update, control_thrusters)
+        .add_systems(Update, camera_angle_input)
         .add_systems(Update, start_simulation.run_if(in_state(AppState::Loading)))
         .run();
 }
@@ -123,4 +127,31 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
         drone_descriptor: None,
         uuv_descriptor: None,
     });
+}
+
+fn camera_angle_input(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut ew_rotate: EventWriter<RotateCamera>,
+) {
+    let mut delta_yaw = 0.0;
+    let mut delta_pitch = 0.0;
+    let step = 0.05;
+    if keyboard_input.pressed(KeyCode::ArrowLeft) {
+        delta_yaw += step;
+    }
+    if keyboard_input.pressed(KeyCode::ArrowRight) {
+        delta_yaw -= step;
+    }
+    if keyboard_input.pressed(KeyCode::ArrowUp) {
+        delta_pitch += step;
+    }
+    if keyboard_input.pressed(KeyCode::ArrowDown) {
+        delta_pitch -= step;
+    }
+    if delta_yaw != 0.0 || delta_pitch != 0.0 {
+        ew_rotate.send(RotateCamera {
+            delta_yaw,
+            delta_pitch,
+        });
+    }
 }
