@@ -29,6 +29,8 @@ uom = "0.37"
 uav = { version = "0.1.2" }
 roxmltree = "0.20"
 queues = "1.0.2"
+ehttp = "0.5"
+crossbeam-channel = "0.5"
 
 [dev-dependencies]
 bevy = { version = "0.16", default-features = false, features = [

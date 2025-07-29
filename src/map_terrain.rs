@@ -1,4 +1,7 @@
 use bevy::prelude::*;
+use crossbeam_channel::{Receiver, Sender};
+use ehttp::Request;
+use std::{collections::HashSet, path::Path};
 
 #[derive(Resource, Clone)]
 pub struct MapConfig {
@@ -9,6 +12,38 @@ pub struct MapConfig {
     pub tile_source_url: String,
     pub cache_dir: String,
     pub tile_radius: u32,
+}
+
+#[derive(Event)]
+pub struct TileRequest {
+    pub z: u8,
+    pub x: u32,
+    pub y: u32,
+}
+
+#[derive(Resource)]
+pub struct TileCache {
+    pub in_flight: HashSet<(u8, u32, u32)>,
+    pub sender: Sender<TileResponse>,
+    pub receiver: Receiver<TileResponse>,
+}
+
+impl Default for TileCache {
+    fn default() -> Self {
+        let (tx, rx) = crossbeam_channel::unbounded();
+        Self {
+            in_flight: HashSet::new(),
+            sender: tx,
+            receiver: rx,
+        }
+    }
+}
+
+pub struct TileResponse {
+    pub z: u8,
+    pub x: u32,
+    pub y: u32,
+    pub bytes: Option<Vec<u8>>,
 }
 
 pub struct MapTerrainPlugin {
@@ -23,7 +58,10 @@ impl MapTerrainPlugin {
 
 impl Plugin for MapTerrainPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(self.config.clone());
+        app.insert_resource(self.config.clone())
+            .init_resource::<TileCache>()
+            .add_event::<TileRequest>()
+            .add_systems(Update, (download_tiles, process_downloads));
     }
 }
 
@@ -53,6 +91,63 @@ pub fn geo_to_world(lat: f64, lon: f64, config: &MapConfig) -> Vec2 {
     let reference = geo_to_mercator(config.reference_lat, config.reference_lon);
     let point = geo_to_mercator(lat, lon);
     point - reference
+}
+
+fn tile_path(z: u8, x: u32, y: u32) -> String {
+    format!("assets/tiles/{z}/{x}/{y}.png")
+}
+
+fn download_tiles(
+    mut requests: EventReader<TileRequest>,
+    mut cache: ResMut<TileCache>,
+    config: Res<MapConfig>,
+) {
+    for req in requests.read() {
+        let key = (req.z, req.x, req.y);
+
+        #[cfg(not(target_arch = "wasm32"))]
+        if Path::new(&tile_path(req.z, req.x, req.y)).exists() {
+            continue;
+        }
+
+        if cache.in_flight.contains(&key) {
+            continue;
+        }
+
+        cache.in_flight.insert(key);
+        let url = config
+            .tile_source_url
+            .replace("{z}", &req.z.to_string())
+            .replace("{x}", &req.x.to_string())
+            .replace("{y}", &req.y.to_string());
+
+        let tx = cache.sender.clone();
+        let z = req.z;
+        let x = req.x;
+        let y = req.y;
+
+        ehttp::fetch(Request::get(url), move |result| {
+            let bytes = result.ok().map(|r| r.bytes);
+            let _ = tx.send(TileResponse { z, x, y, bytes });
+        });
+    }
+}
+
+fn process_downloads(mut cache: ResMut<TileCache>) {
+    while let Ok(res) = cache.receiver.try_recv() {
+        cache.in_flight.remove(&(res.z, res.x, res.y));
+        if let Some(bytes) = res.bytes {
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let path = tile_path(res.z, res.x, res.y);
+                if let Some(dir) = Path::new(&path).parent() {
+                    if std::fs::create_dir_all(dir).is_ok() {
+                        let _ = std::fs::write(path, &bytes);
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -92,4 +187,3 @@ mod tests {
         assert!((delta.x as f64 - 111.32).abs() < 0.5);
     }
 }
-
