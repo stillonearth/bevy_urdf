@@ -502,7 +502,7 @@ fn multirotor_dynamics(
 
 pub(crate) fn render_drone_rotors(
     mut q_rotors: Query<(Entity, &ChildOf, &mut Transform, &DroneRotor)>,
-    mut q_bodies: Query<(Entity, &ChildOf, &mut Transform), Without<DroneRotor>>,
+    q_bodies: Query<(Entity, &ChildOf, &Transform), Without<DroneRotor>>,
 ) {
     let quat_fix = Quat::from_rotation_x(std::f32::consts::PI / 2.0);
     for (_, child_of, mut transform, rotor) in q_rotors.iter_mut() {

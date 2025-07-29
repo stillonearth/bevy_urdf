@@ -148,12 +148,14 @@ fn world_to_tile(z: u8, world: Vec2, config: &MapConfig) -> (u32, u32) {
     (lon_to_tile_x(z, lon), lat_to_tile_y(z, lat))
 }
 
-fn tile_path(z: u8, x: u32, y: u32) -> String {
-    format!("assets/tiles/{z}/{x}/{y}.png")
+/// Path used with the [`AssetServer`] to load a tile texture.
+fn tile_asset_path(z: u8, x: u32, y: u32) -> String {
+    format!("tiles/{z}/{x}/{y}.png")
 }
 
-fn heightmap_path(z: u8, x: u32, y: u32) -> String {
-    format!("assets/heightmaps/{z}/{x}/{y}.png")
+/// Path used on disk for caching downloaded tiles.
+fn tile_cache_path(z: u8, x: u32, y: u32, cfg: &MapConfig) -> String {
+    format!("{}/tiles/{z}/{x}/{y}.png", cfg.cache_dir)
 }
 
 fn tile_to_lon(z: u8, x: u32) -> f64 {
@@ -167,12 +169,7 @@ fn tile_to_lat(z: u8, y: u32) -> f64 {
     lat_rad.to_degrees()
 }
 
-fn heightmap_to_mesh(
-    img: &image::GrayImage,
-    width: f32,
-    height: f32,
-    scale: f32,
-) -> Mesh {
+fn heightmap_to_mesh(img: &image::GrayImage, width: f32, height: f32, scale: f32) -> Mesh {
     use bevy::render::mesh::{Indices, PrimitiveTopology};
 
     let w = img.width() as usize;
@@ -204,7 +201,10 @@ fn heightmap_to_mesh(
 
             positions.push([x, y, z]);
             normals.push(normal.to_array());
-            uvs.push([i as f32 / (w as f32 - 1.0), 1.0 - j as f32 / (h as f32 - 1.0)]);
+            uvs.push([
+                i as f32 / (w as f32 - 1.0),
+                1.0 - j as f32 / (h as f32 - 1.0),
+            ]);
         }
     }
 
@@ -219,7 +219,10 @@ fn heightmap_to_mesh(
         }
     }
 
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
+    let mut mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    );
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
@@ -272,11 +275,10 @@ fn spawn_tile(
         }
     }
 
-    let mesh_handle = meshes.add(
-        mesh.unwrap_or_else(|| Plane3d::default().mesh().size(width, height).into()),
-    );
-    let path = tile_path(z, x, y);
-    let handle: Handle<Image> = asset_server.load(path.as_str());
+    let mesh_handle =
+        meshes.add(mesh.unwrap_or_else(|| Plane3d::default().mesh().size(width, height).into()));
+    let asset_path = tile_asset_path(z, x, y);
+    let handle: Handle<Image> = asset_server.load(asset_path.as_str());
     let material = materials.add(StandardMaterial {
         base_color_texture: Some(handle.clone()),
         unlit: true,
@@ -309,7 +311,7 @@ fn download_tiles(
         }
 
         #[cfg(not(target_arch = "wasm32"))]
-        if Path::new(&tile_path(req.z, req.x, req.y)).exists() {
+        if Path::new(&tile_cache_path(req.z, req.x, req.y, &config)).exists() {
             spawn_tile(
                 &mut commands,
                 &asset_server,
@@ -335,14 +337,11 @@ fn download_tiles(
             .replace("{x}", &req.x.to_string())
             .replace("{y}", &req.y.to_string());
 
-        let hm_url = config
-            .heightmap_source_url
-            .as_ref()
-            .map(|u| {
-                u.replace("{z}", &req.z.to_string())
-                    .replace("{x}", &req.x.to_string())
-                    .replace("{y}", &req.y.to_string())
-            });
+        let hm_url = config.heightmap_source_url.as_ref().map(|u| {
+            u.replace("{z}", &req.z.to_string())
+                .replace("{x}", &req.x.to_string())
+                .replace("{y}", &req.y.to_string())
+        });
 
         let tx = cache.sender.clone();
         let z = req.z;
@@ -390,7 +389,7 @@ fn process_downloads(
         if let Some(bytes) = res.image_bytes {
             #[cfg(not(target_arch = "wasm32"))]
             {
-                let path = tile_path(res.z, res.x, res.y);
+                let path = tile_cache_path(res.z, res.x, res.y, &config);
                 if let Some(dir) = Path::new(&path).parent() {
                     if std::fs::create_dir_all(dir).is_ok() {
                         let _ = std::fs::write(&path, &bytes);
@@ -439,7 +438,7 @@ fn update_tiles(
     mut active: ResMut<ActiveTiles>,
     q_tiles: Query<(Entity, &MapTile)>,
 ) {
-    let Ok(transform) = q_uuv.get_single() else {
+    let Ok(transform) = q_uuv.single() else {
         return;
     };
     let pos = transform.translation();
@@ -475,7 +474,7 @@ fn update_tiles(
     for (entity, tile) in q_tiles.iter() {
         let key = (tile.z, tile.x, tile.y);
         if !needed.contains(&key) {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
             cache.spawned.remove(&key);
         } else {
             active.tiles.insert(key, entity);
@@ -484,7 +483,7 @@ fn update_tiles(
 
     for key in needed {
         if !cache.spawned.contains(&key) && !cache.in_flight.contains(&key) {
-            ew_requests.send(TileRequest {
+            ew_requests.write(TileRequest {
                 z: key.0,
                 x: key.1,
                 y: key.2,
