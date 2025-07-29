@@ -127,6 +127,7 @@ pub struct URDFRobot {
 pub enum RobotType {
     Drone,
     NotDrone,
+    Uuv,
 }
 
 impl FromStr for RobotType {
@@ -136,6 +137,7 @@ impl FromStr for RobotType {
         match s.to_lowercase().as_str() {
             "drone" => Ok(RobotType::Drone),
             "notdrone" | "not_drone" | "not-drone" => Ok(RobotType::NotDrone),
+            "uuv" => Ok(RobotType::Uuv),
             _ => Err(format!("Invalid robot type: '{s}'")),
         }
     }
