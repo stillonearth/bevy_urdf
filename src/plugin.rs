@@ -21,10 +21,11 @@ use crate::{
         handle_control_thrusts, render_drone_rotors, simulate_drone, switch_drone_physics,
         ControlThrusts,
     },
+    uuv::simulate_uuv,
     events::{
         handle_control_motors, handle_despawn_robot, handle_load_robot, handle_spawn_robot,
         handle_wait_robot_loaded, ControlMotors, DespawnRobot, LoadRobot, RobotLoaded,
-        RobotSpawned, SensorsRead, SpawnRobot, UAVStateUpdate, WaitRobotLoaded,
+        RobotSpawned, SensorsRead, SpawnRobot, UAVStateUpdate, UuvStateUpdate, WaitRobotLoaded,
     },
     urdf_asset_loader::{self, UrdfAsset},
 };
@@ -48,7 +49,7 @@ where
     /// [`with_default_system_setup(false)`](Self::with_default_system_setup).
     pub fn get_systems(set: PhysicsSet) -> ScheduleConfigs<ScheduleSystem> {
         match set {
-            PhysicsSet::StepSimulation => ((switch_drone_physics, simulate_drone).chain())
+            PhysicsSet::StepSimulation => ((switch_drone_physics, simulate_drone, simulate_uuv).chain())
                 .in_set(PhysicsSet::StepSimulation)
                 .into_configs(),
             PhysicsSet::SyncBackend => (
@@ -94,6 +95,7 @@ impl Plugin for UrdfPlugin {
             .add_event::<RobotSpawned>()
             .add_event::<SensorsRead>()
             .add_event::<UAVStateUpdate>()
+            .add_event::<UuvStateUpdate>()
             .add_event::<SpawnRobot>()
             .add_event::<WaitRobotLoaded>()
             .init_asset::<urdf_asset_loader::UrdfAsset>();

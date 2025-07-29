@@ -89,6 +89,12 @@ pub struct UAVStateUpdate {
 }
 
 #[derive(Event)]
+pub struct UuvStateUpdate {
+    pub handle: Handle<UrdfAsset>,
+    pub uuv_state: crate::uuv::UuvState,
+}
+
+#[derive(Event)]
 pub struct ControlMotors {
     pub handle: Handle<UrdfAsset>,
     pub velocities: Vec<f32>,
