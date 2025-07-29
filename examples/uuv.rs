@@ -30,12 +30,12 @@ fn main() {
                 enable_multipass_for_primary_context: true,
             },
             MapTerrainPlugin::new(MapConfig {
-                // Reference point roughly centered on the UUV example area
-                reference_lat: 47.6205,
-                reference_lon: -122.3493,
+                // Reference point for Newport Harbor (approx.)
+                reference_lat: 41.61906,
+                reference_lon: -71.20932,
                 // Highest zoom first; radius in tiles around the UUV
                 zoom_levels: vec![(16, 1), (15, 2)],
-                tile_source_url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png".to_string(),
+                tile_source_url: "https://tiles.gebco.net/tiles/{z}/{x}/{y}.png".to_string(),
                 heightmap_source_url: None,
                 height_scale: 1.0,
                 cache_dir: "assets/tiles".to_string(),
