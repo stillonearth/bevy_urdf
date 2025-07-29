@@ -1,5 +1,7 @@
 use std::collections::VecDeque;
 
+use anyhow::Error;
+
 use bevy::prelude::*;
 
 use crate::{
@@ -29,6 +31,7 @@ pub struct UuvDescriptor {
     pub thrust_force: Vec3,
     pub thrust_torque: Vec3,
     pub thruster_forces: Vec<f32>,
+    pub thruster_positions: Vec<Vec3>,
     pub fin_angles: Vec<f32>,
     pub state: UuvState,
     pub(crate) state_log: VecDeque<UuvState>,
@@ -46,6 +49,7 @@ impl Default for UuvDescriptor {
             thrust_force: Vec3::ZERO,
             thrust_torque: Vec3::ZERO,
             thruster_forces: Vec::new(),
+            thruster_positions: Vec::new(),
             fin_angles: Vec::new(),
             state: UuvState::default(),
             state_log: VecDeque::new(),
@@ -61,6 +65,24 @@ impl UuvDescriptor {
         }
         self.state_log.push_back(state);
     }
+}
+
+pub fn try_extract_uuv_thruster_positions(xml_content: &str) -> Result<Vec<Vec3>, Error> {
+    let urdf_robot = urdf_rs::read_from_string(xml_content)?;
+    let mut thruster_positions = Vec::new();
+
+    for link in urdf_robot.links.iter() {
+        if link.name.to_lowercase().contains("thruster") {
+            let origin = link.inertial.origin.xyz.0;
+            thruster_positions.push(Vec3::new(
+                origin[0] as f32,
+                origin[1] as f32,
+                origin[2] as f32,
+            ));
+        }
+    }
+
+    Ok(thruster_positions)
 }
 
 pub(crate) fn simulate_uuv(

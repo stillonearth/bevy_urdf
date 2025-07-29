@@ -13,11 +13,17 @@ use crate::{
     },
     plugin::{extract_robot_geometry, URDFRobot, URDFRobotRigidBodyHandle},
     urdf_asset_loader::{RpyAssetLoaderSettings, UrdfAsset},
+    uuv::{try_extract_uuv_thruster_positions, UuvDescriptor},
     RobotType,
 };
 
 #[derive(Component)]
 pub struct Rotor {}
+
+#[derive(Component)]
+pub struct Thruster {
+    pub index: usize,
+}
 
 #[derive(Clone, Event)]
 pub struct SpawnRobot {
@@ -26,6 +32,7 @@ pub struct SpawnRobot {
     pub parent_entity: Option<Entity>,
     pub robot_type: RobotType,
     pub drone_descriptor: Option<DroneDescriptor>,
+    pub uuv_descriptor: Option<UuvDescriptor>,
 }
 
 #[derive(Clone, Event)]
@@ -45,6 +52,7 @@ pub struct WaitRobotLoaded {
     pub parent_entity: Option<Entity>,
     pub robot_type: RobotType,
     pub drone_descriptor: Option<DroneDescriptor>,
+    pub uuv_descriptor: Option<UuvDescriptor>,
 }
 
 #[derive(Clone, Event)]
@@ -54,6 +62,7 @@ pub struct RobotLoaded {
     pub marker: Option<u32>,
     pub robot_type: RobotType,
     pub drone_descriptor: Option<DroneDescriptor>,
+    pub uuv_descriptor: Option<UuvDescriptor>,
 }
 
 #[derive(Clone)]
@@ -71,6 +80,7 @@ pub struct LoadRobot {
     pub mesh_dir: String,
     pub rapier_options: RapierOption,
     pub drone_descriptor: Option<DroneDescriptor>,
+    pub uuv_descriptor: Option<UuvDescriptor>,
     /// this field can be used to keep causality of `LoadRobot -> RobotLoaded` event chain
     pub marker: Option<u32>,
 }
@@ -135,6 +145,7 @@ pub(crate) fn handle_spawn_robot(
         let rapier_context_simulation_entity = q_rapier_context_simulation.iter().next().unwrap().0;
         let robot_handle = event.handle.clone();
         let mut drone_descriptor = event.drone_descriptor.clone();
+        let mut uuv_descriptor = event.uuv_descriptor.clone();
 
         if let Some(urdf) = urdf_assets.get(robot_handle.id()) {
             let mut maybe_rapier_handles: Option<UrdfRobotHandles<Option<MultibodyJointHandle>>> =
@@ -161,6 +172,16 @@ pub(crate) fn handle_spawn_robot(
                         aerodynamic_props: adp,
                         dynamics_model_props: dmp,
                         visual_body_properties: vbp,
+                        ..default()
+                    });
+                }
+
+                if event.robot_type == RobotType::Uuv && uuv_descriptor.is_none() {
+                    let urdf_asset = urdf_assets.get(&event.handle).unwrap();
+                    let thrusters =
+                        try_extract_uuv_thruster_positions(&urdf_asset.xml_string).unwrap_or_default();
+                    uuv_descriptor = Some(UuvDescriptor {
+                        thruster_positions: thrusters,
                         ..default()
                     });
                 }
@@ -194,6 +215,10 @@ pub(crate) fn handle_spawn_robot(
 
             if event.robot_type == RobotType::Drone {
                 ec.insert(drone_descriptor.clone().unwrap());
+            }
+
+            if event.robot_type == RobotType::Uuv {
+                ec.insert(uuv_descriptor.clone().unwrap());
             }
 
             ec.insert((
@@ -302,7 +327,7 @@ pub(crate) fn handle_spawn_robot(
 
                     // insert entity id to collider data, otherwise it breaks in debug mode
                     let entity_id = ec.id().index();
-                    for (_entity, mut rigid_body_set, mut collider_set, _) in
+                for (_entity, mut rigid_body_set, mut collider_set, _) in
                         q_rapier_context.iter_mut()
                     {
                         if let Some(rigid_body) = rigid_body_set.bodies.get_mut(body_handles[index])
@@ -313,6 +338,17 @@ pub(crate) fn handle_spawn_robot(
                                     collider_set.colliders.get_mut(*collider_handle).unwrap();
                                 collider.user_data = entity_id as u128;
                             }
+                        }
+                    }
+                }
+
+                if event.robot_type == RobotType::Uuv {
+                    if let Some(desc) = uuv_descriptor.clone() {
+                        for (thruster_index, pos) in desc.thruster_positions.iter().enumerate() {
+                            children.spawn((
+                                Thruster { index: thruster_index },
+                                Transform::from_translation(*pos),
+                            ));
                         }
                     }
                 }
@@ -328,6 +364,7 @@ pub(crate) fn handle_spawn_robot(
                 parent_entity: event.parent_entity,
                 robot_type: event.robot_type,
                 drone_descriptor: event.drone_descriptor.clone(),
+                uuv_descriptor: event.uuv_descriptor.clone(),
             });
         }
     }
@@ -412,6 +449,7 @@ pub(crate) fn handle_load_robot(
             marker: event.marker,
             robot_type: event.robot_type,
             drone_descriptor: event.drone_descriptor.clone(),
+            uuv_descriptor: event.uuv_descriptor.clone(),
         });
     }
 }
@@ -426,6 +464,7 @@ pub(crate) fn handle_wait_robot_loaded(
             parent_entity: event.parent_entity,
             robot_type: event.robot_type,
             drone_descriptor: event.drone_descriptor.clone(),
+            uuv_descriptor: event.uuv_descriptor.clone(),
         });
     }
 }
