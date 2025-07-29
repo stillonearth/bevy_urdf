@@ -83,11 +83,11 @@ impl<const N: usize> core::ops::Add<Coord<{ N }>> for Coord<{ N }> {
     }
 }
 
-#[cfg(dormand_prince_logging)]
+#[cfg(feature = "dormand_prince_logging")]
 macro_rules! log {
     ($($arg:tt)*) => (eprint!($($arg)*));
 }
-#[cfg(dormand_prince_logging)]
+#[cfg(feature = "dormand_prince_logging")]
 macro_rules! logln {
     () => (log!("\n"));
     ($($arg:tt)*) => ({
@@ -96,11 +96,11 @@ macro_rules! logln {
 }
 
 #[allow(unused_macros)]
-#[cfg(not(dormand_prince_logging))]
+#[cfg(not(feature = "dormand_prince_logging"))]
 macro_rules! log {
     ($($arg:tt)*) => {};
 }
-#[cfg(not(dormand_prince_logging))]
+#[cfg(not(feature = "dormand_prince_logging"))]
 macro_rules! logln {
     () => {
         log!("\n")
