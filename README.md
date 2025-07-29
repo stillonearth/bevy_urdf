@@ -157,6 +157,9 @@ cargo run --example quadruped --release
 cargo run --example uuv --release
 ```
 
+When using `MapTerrainPlugin` (for example in the `uuv` example), the Bevy `png`
+feature must be enabled so that PNG tile images can be loaded correctly.
+
 ## URDF Requirements
 
 Before using URDF files with this plugin:
