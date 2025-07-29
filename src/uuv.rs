@@ -2,7 +2,10 @@ use std::collections::VecDeque;
 
 use bevy::prelude::*;
 
-use crate::{events::UuvStateUpdate, URDFRobot};
+use crate::{
+    events::{ControlFins, ControlThrusters, UuvStateUpdate},
+    URDFRobot,
+};
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct HydrodynamicProperties {
@@ -25,6 +28,8 @@ pub struct UuvDescriptor {
     pub hydrodynamic_props: HydrodynamicProperties,
     pub thrust_force: Vec3,
     pub thrust_torque: Vec3,
+    pub thruster_forces: Vec<f32>,
+    pub fin_angles: Vec<f32>,
     pub state: UuvState,
     pub(crate) state_log: VecDeque<UuvState>,
 }
@@ -40,6 +45,8 @@ impl Default for UuvDescriptor {
             },
             thrust_force: Vec3::ZERO,
             thrust_torque: Vec3::ZERO,
+            thruster_forces: Vec::new(),
+            fin_angles: Vec::new(),
             state: UuvState::default(),
             state_log: VecDeque::new(),
         }
@@ -65,6 +72,13 @@ pub(crate) fn simulate_uuv(
         let dt = time.delta_secs();
         let props = descriptor.hydrodynamic_props;
         let mut state = descriptor.state;
+
+        // derive forces and torques from thruster and fin commands
+        let thrust_total: f32 = descriptor.thruster_forces.iter().sum();
+        descriptor.thrust_force = state.orientation * Vec3::new(thrust_total, 0.0, 0.0);
+
+        let fin_torque: f32 = descriptor.fin_angles.iter().sum();
+        descriptor.thrust_torque = Vec3::new(0.0, fin_torque, 0.0);
 
         let buoyancy_force = Vec3::new(0.0, props.buoyancy, 0.0);
         let drag_force = props.linear_drag * state.linear_velocity;
@@ -92,3 +106,30 @@ pub(crate) fn simulate_uuv(
     }
 }
 
+pub(crate) fn handle_control_thrusters(
+    mut er_thrusters: EventReader<ControlThrusters>,
+    mut q_uuvs: Query<(&URDFRobot, &mut UuvDescriptor)>,
+) {
+    for event in er_thrusters.read() {
+        for (robot, mut descriptor) in q_uuvs.iter_mut() {
+            if robot.handle != event.handle {
+                continue;
+            }
+            descriptor.thruster_forces = event.thrusts.clone();
+        }
+    }
+}
+
+pub(crate) fn handle_control_fins(
+    mut er_fins: EventReader<ControlFins>,
+    mut q_uuvs: Query<(&URDFRobot, &mut UuvDescriptor)>,
+) {
+    for event in er_fins.read() {
+        for (robot, mut descriptor) in q_uuvs.iter_mut() {
+            if robot.handle != event.handle {
+                continue;
+            }
+            descriptor.fin_angles = event.angles.clone();
+        }
+    }
+}
