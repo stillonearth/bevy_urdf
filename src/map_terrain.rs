@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::prelude::Plane3d;
 use crossbeam_channel::{Receiver, Sender};
 use ehttp::Request;
 use std::{collections::HashSet, path::Path};
@@ -12,6 +13,8 @@ pub struct MapConfig {
     pub tile_source_url: String,
     pub cache_dir: String,
     pub tile_radius: u32,
+    /// distance between zoom layers along the Y axis
+    pub z_layer: f32,
 }
 
 #[derive(Event)]
@@ -24,6 +27,7 @@ pub struct TileRequest {
 #[derive(Resource)]
 pub struct TileCache {
     pub in_flight: HashSet<(u8, u32, u32)>,
+    pub spawned: HashSet<(u8, u32, u32)>,
     pub sender: Sender<TileResponse>,
     pub receiver: Receiver<TileResponse>,
 }
@@ -33,6 +37,7 @@ impl Default for TileCache {
         let (tx, rx) = crossbeam_channel::unbounded();
         Self {
             in_flight: HashSet::new(),
+            spawned: HashSet::new(),
             sender: tx,
             receiver: rx,
         }
@@ -44,6 +49,13 @@ pub struct TileResponse {
     pub x: u32,
     pub y: u32,
     pub bytes: Option<Vec<u8>>,
+}
+
+#[derive(Component)]
+struct MapTile {
+    z: u8,
+    x: u32,
+    y: u32,
 }
 
 pub struct MapTerrainPlugin {
@@ -97,16 +109,91 @@ fn tile_path(z: u8, x: u32, y: u32) -> String {
     format!("assets/tiles/{z}/{x}/{y}.png")
 }
 
+fn tile_to_lon(z: u8, x: u32) -> f64 {
+    let n = 2f64.powi(z as i32);
+    x as f64 / n * 360.0 - 180.0
+}
+
+fn tile_to_lat(z: u8, y: u32) -> f64 {
+    let n = 2f64.powi(z as i32);
+    let lat_rad = f64::atan(f64::sinh(std::f64::consts::PI * (1.0 - 2.0 * y as f64 / n)));
+    lat_rad.to_degrees()
+}
+
+fn spawn_tile(
+    commands: &mut Commands,
+    asset_server: &Res<AssetServer>,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    config: &MapConfig,
+    z: u8,
+    x: u32,
+    y: u32,
+) {
+    let west = tile_to_lon(z, x);
+    let east = tile_to_lon(z, x + 1);
+    let north = tile_to_lat(z, y);
+    let south = tile_to_lat(z, y + 1);
+
+    let center_lat = (north + south) / 2.0;
+    let center_lon = (west + east) / 2.0;
+
+    let center = geo_to_world(center_lat, center_lon, config);
+    let west_world = geo_to_world(center_lat, west, config);
+    let east_world = geo_to_world(center_lat, east, config);
+    let north_world = geo_to_world(north, center_lon, config);
+    let south_world = geo_to_world(south, center_lon, config);
+
+    let width = (east_world.x - west_world.x).abs();
+    let height = (north_world.y - south_world.y).abs();
+
+    let mesh = meshes.add(Plane3d::default().mesh().size(width, height));
+    let path = tile_path(z, x, y);
+    let handle: Handle<Image> = asset_server.load(path.as_str());
+    let material = materials.add(StandardMaterial {
+        base_color_texture: Some(handle.clone()),
+        unlit: true,
+        cull_mode: None,
+        ..default()
+    });
+
+    commands.spawn((
+        Mesh3d(mesh),
+        MeshMaterial3d(material),
+        Transform::from_xyz(center.x, config.z_layer * z as f32, center.y),
+        MapTile { z, x, y },
+    ));
+}
+
 fn download_tiles(
+    mut commands: Commands,
     mut requests: EventReader<TileRequest>,
     mut cache: ResMut<TileCache>,
     config: Res<MapConfig>,
+    asset_server: Res<AssetServer>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     for req in requests.read() {
         let key = (req.z, req.x, req.y);
 
+        if cache.spawned.contains(&key) {
+            continue;
+        }
+
         #[cfg(not(target_arch = "wasm32"))]
         if Path::new(&tile_path(req.z, req.x, req.y)).exists() {
+            spawn_tile(
+                &mut commands,
+                &asset_server,
+                &mut meshes,
+                &mut materials,
+                &config,
+                req.z,
+                req.x,
+                req.y,
+            );
+            cache.spawned.insert(key);
             continue;
         }
 
@@ -133,20 +220,40 @@ fn download_tiles(
     }
 }
 
-fn process_downloads(mut cache: ResMut<TileCache>) {
+fn process_downloads(
+    mut commands: Commands,
+    mut cache: ResMut<TileCache>,
+    asset_server: Res<AssetServer>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    config: Res<MapConfig>,
+) {
     while let Ok(res) = cache.receiver.try_recv() {
-        cache.in_flight.remove(&(res.z, res.x, res.y));
+        let key = (res.z, res.x, res.y);
+        cache.in_flight.remove(&key);
         if let Some(bytes) = res.bytes {
             #[cfg(not(target_arch = "wasm32"))]
             {
                 let path = tile_path(res.z, res.x, res.y);
                 if let Some(dir) = Path::new(&path).parent() {
                     if std::fs::create_dir_all(dir).is_ok() {
-                        let _ = std::fs::write(path, &bytes);
+                        let _ = std::fs::write(&path, &bytes);
                     }
                 }
             }
         }
+
+        spawn_tile(
+            &mut commands,
+            &asset_server,
+            &mut meshes,
+            &mut materials,
+            &config,
+            res.z,
+            res.x,
+            res.y,
+        );
+        cache.spawned.insert(key);
     }
 }
 
@@ -163,6 +270,7 @@ mod tests {
             tile_source_url: String::new(),
             cache_dir: String::new(),
             tile_radius: 0,
+            z_layer: 0.0,
         }
     }
 
