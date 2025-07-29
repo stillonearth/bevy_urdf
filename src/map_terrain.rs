@@ -1,5 +1,6 @@
 use bevy::prelude::Plane3d;
 use bevy::prelude::*;
+use bevy::render::render_asset::RenderAssetUsages;
 use crossbeam_channel::{Receiver, Sender};
 use ehttp::Request;
 use image;
@@ -112,7 +113,7 @@ fn geo_to_mercator(lat: f64, lon: f64) -> Vec2 {
 #[allow(dead_code)]
 fn mercator_to_geo(x: f64, y: f64) -> (f64, f64) {
     let lon = x / EARTH_RADIUS_M;
-    let lat = (2.0 * f64::atan(f64::exp(y / EARTH_RADIUS_M)) - std::f64::consts::FRAC_PI_2);
+    let lat = 2.0 * f64::atan(f64::exp(y / EARTH_RADIUS_M)) - std::f64::consts::FRAC_PI_2;
     (lat.to_degrees(), lon.to_degrees())
 }
 
@@ -218,11 +219,11 @@ fn heightmap_to_mesh(
         }
     }
 
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-    mesh.set_indices(Some(Indices::U32(indices)));
+    mesh.insert_indices(Indices::U32(indices));
     mesh
 }
 
@@ -271,7 +272,9 @@ fn spawn_tile(
         }
     }
 
-    let mesh_handle = meshes.add(mesh.unwrap_or_else(|| Plane3d::default().mesh().size(width, height)));
+    let mesh_handle = meshes.add(
+        mesh.unwrap_or_else(|| Plane3d::default().mesh().size(width, height).into()),
+    );
     let path = tile_path(z, x, y);
     let handle: Handle<Image> = asset_server.load(path.as_str());
     let material = materials.add(StandardMaterial {

@@ -33,6 +33,9 @@ ehttp = "0.5"
 crossbeam-channel = "0.5"
 image = "0.24"
 
+[patch.crates-io]
+fast_ode = { path = "patches/fast_ode-1.0.0" }
+
 [dev-dependencies]
 bevy = { version = "0.16", default-features = false, features = [
     "bevy_asset",
