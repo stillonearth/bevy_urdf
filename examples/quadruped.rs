@@ -82,6 +82,7 @@ fn start_simulation(
             parent_entity: None,
             robot_type: RobotType::NotDrone,
             drone_descriptor: None,
+            uuv_descriptor: None,
         });
         state.set(AppState::Simulation);
         commands.insert_resource(UrdfRobotHandle(Some(event.handle.clone())));
@@ -214,5 +215,6 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
         },
         marker: None,
         drone_descriptor: None,
+        uuv_descriptor: None,
     });
 }

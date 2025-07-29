@@ -104,6 +104,7 @@ fn start_simulation(
             parent_entity: Some(q_crazflie.iter().last().unwrap().0),
             robot_type: RobotType::Drone,
             drone_descriptor: event.drone_descriptor.clone(),
+            uuv_descriptor: event.uuv_descriptor.clone(),
         });
         state.set(AppState::Simulation);
         commands.insert_resource(UrdfRobotHandle(Some(event.handle.clone())));
@@ -206,5 +207,6 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
             translation_shift: Some(Vec3::new(0.0, 1.0, 0.0)),
         },
         drone_descriptor: None,
+        uuv_descriptor: None,
     });
 }
