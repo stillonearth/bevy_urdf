@@ -153,7 +153,7 @@ cargo run --example quadrotor --release
 # Quadruped robot simulation
 cargo run --example quadruped --release
 
-# Underwater vehicle simulation
+# Underwater vehicle simulation with map terrain
 cargo run --example uuv --release
 ```
 
