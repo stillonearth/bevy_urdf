@@ -1,8 +1,11 @@
-use bevy::prelude::*;
 use bevy::prelude::Plane3d;
+use bevy::prelude::*;
 use crossbeam_channel::{Receiver, Sender};
 use ehttp::Request;
-use std::{collections::HashSet, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+};
 
 #[derive(Resource, Clone)]
 pub struct MapConfig {
@@ -51,6 +54,11 @@ pub struct TileResponse {
     pub bytes: Option<Vec<u8>>,
 }
 
+#[derive(Resource, Default)]
+pub struct ActiveTiles {
+    pub tiles: HashMap<(u8, u32, u32), Entity>,
+}
+
 #[derive(Component)]
 struct MapTile {
     z: u8,
@@ -72,8 +80,12 @@ impl Plugin for MapTerrainPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(self.config.clone())
             .init_resource::<TileCache>()
+            .init_resource::<ActiveTiles>()
             .add_event::<TileRequest>()
-            .add_systems(Update, (download_tiles, process_downloads));
+            .add_systems(
+                Update,
+                (download_tiles, process_downloads, update_tiles).chain(),
+            );
     }
 }
 
@@ -103,6 +115,29 @@ pub fn geo_to_world(lat: f64, lon: f64, config: &MapConfig) -> Vec2 {
     let reference = geo_to_mercator(config.reference_lat, config.reference_lon);
     let point = geo_to_mercator(lat, lon);
     point - reference
+}
+
+fn world_to_geo(x: f32, y: f32, config: &MapConfig) -> (f64, f64) {
+    let reference = geo_to_mercator(config.reference_lat, config.reference_lon);
+    let point = Vec2::new(x, y) + reference;
+    mercator_to_geo(point.x as f64, point.y as f64)
+}
+
+fn lon_to_tile_x(z: u8, lon: f64) -> u32 {
+    let n = 2f64.powi(z as i32);
+    ((lon + 180.0) / 360.0 * n).floor() as u32
+}
+
+fn lat_to_tile_y(z: u8, lat: f64) -> u32 {
+    let n = 2f64.powi(z as i32);
+    let lat_rad = lat.to_radians();
+    ((1.0 - (lat_rad.tan() + 1.0 / lat_rad.cos()).ln() / std::f64::consts::PI) / 2.0 * n).floor()
+        as u32
+}
+
+fn world_to_tile(z: u8, world: Vec2, config: &MapConfig) -> (u32, u32) {
+    let (lat, lon) = world_to_geo(world.x, world.y, config);
+    (lon_to_tile_x(z, lon), lat_to_tile_y(z, lat))
 }
 
 fn tile_path(z: u8, x: u32, y: u32) -> String {
@@ -254,6 +289,57 @@ fn process_downloads(
             res.y,
         );
         cache.spawned.insert(key);
+    }
+}
+
+fn update_tiles(
+    mut commands: Commands,
+    q_uuv: Query<&GlobalTransform, With<crate::uuv::UuvDescriptor>>,
+    mut ew_requests: EventWriter<TileRequest>,
+    mut cache: ResMut<TileCache>,
+    config: Res<MapConfig>,
+    mut active: ResMut<ActiveTiles>,
+    q_tiles: Query<(Entity, &MapTile)>,
+) {
+    let Ok(transform) = q_uuv.get_single() else {
+        return;
+    };
+    let pos = transform.translation();
+    let center_world = Vec2::new(pos.x, pos.z);
+
+    let mut needed: HashSet<(u8, u32, u32)> = HashSet::new();
+    for z in config.min_zoom..=config.max_zoom {
+        let (cx, cy) = world_to_tile(z, center_world, &config);
+        let radius = config.tile_radius as i32;
+        let max_index = (1u32 << z) as i32 - 1;
+        for dx in -radius..=radius {
+            for dy in -radius..=radius {
+                let tx = (cx as i32 + dx).clamp(0, max_index) as u32;
+                let ty = (cy as i32 + dy).clamp(0, max_index) as u32;
+                needed.insert((z, tx, ty));
+            }
+        }
+    }
+
+    active.tiles.clear();
+    for (entity, tile) in q_tiles.iter() {
+        let key = (tile.z, tile.x, tile.y);
+        if !needed.contains(&key) {
+            commands.entity(entity).despawn_recursive();
+            cache.spawned.remove(&key);
+        } else {
+            active.tiles.insert(key, entity);
+        }
+    }
+
+    for key in needed {
+        if !cache.spawned.contains(&key) && !cache.in_flight.contains(&key) {
+            ew_requests.send(TileRequest {
+                z: key.0,
+                x: key.1,
+                y: key.2,
+            });
+        }
     }
 }
 
