@@ -31,7 +31,7 @@ Add the necessary plugins to your Bevy app:
 
 ```rust
 use bevy::prelude::*;
-use bevy_urdf::{UrdfPlugin, StlPlugin, ObjPlugin};
+use bevy_urdf::{UrdfPlugin, StlPlugin, ObjPlugin, CameraControlPlugin};
 
 fn main() {
     App::new()
@@ -40,6 +40,7 @@ fn main() {
             UrdfPlugin,
             StlPlugin,
             ObjPlugin,
+            CameraControlPlugin,
         ))
         .run();
 }
@@ -133,6 +134,18 @@ For underwater vehicles:
 pub struct ControlThrusters {
     pub handle: Handle<UrdfAsset>,
     pub thrusts: Vec<f32>,
+}
+```
+
+#### Camera Rotation
+
+Control the viewing angle of any active camera:
+
+```rust
+#[derive(Event)]
+pub struct RotateCamera {
+    pub delta_yaw: f32,
+    pub delta_pitch: f32,
 }
 ```
 
