@@ -11,11 +11,10 @@ use std::{
 pub struct MapConfig {
     pub reference_lat: f64,
     pub reference_lon: f64,
-    pub min_zoom: u8,
-    pub max_zoom: u8,
+    /// List of `(zoom, radius)` pairs sorted from highest zoom to lowest
+    pub zoom_levels: Vec<(u8, u32)>,
     pub tile_source_url: String,
     pub cache_dir: String,
-    pub tile_radius: u32,
     /// distance between zoom layers along the Y axis
     pub z_layer: f32,
 }
@@ -308,16 +307,28 @@ fn update_tiles(
     let center_world = Vec2::new(pos.x, pos.z);
 
     let mut needed: HashSet<(u8, u32, u32)> = HashSet::new();
-    for z in config.min_zoom..=config.max_zoom {
-        let (cx, cy) = world_to_tile(z, center_world, &config);
-        let radius = config.tile_radius as i32;
-        let max_index = (1u32 << z) as i32 - 1;
+    let mut all_tiles: Vec<(u8, u32, u32)> = Vec::new();
+    for (z, radius) in config.zoom_levels.iter() {
+        let (cx, cy) = world_to_tile(*z, center_world, &config);
+        let radius = *radius as i32;
+        let max_index = (1u32 << *z) as i32 - 1;
         for dx in -radius..=radius {
             for dy in -radius..=radius {
                 let tx = (cx as i32 + dx).clamp(0, max_index) as u32;
                 let ty = (cy as i32 + dy).clamp(0, max_index) as u32;
-                needed.insert((z, tx, ty));
+                needed.insert((*z, tx, ty));
+                all_tiles.push((*z, tx, ty));
             }
+        }
+    }
+
+    // Remove lower-zoom tiles that are covered by higher-zoom tiles
+    all_tiles.sort_by_key(|&(z, _, _)| std::cmp::Reverse(z));
+    for &(z_high, x_high, y_high) in &all_tiles {
+        for (z_low, _) in config.zoom_levels.iter().filter(|(zl, _)| *zl < z_high) {
+            let shift = z_high - *z_low;
+            let parent = (*z_low, x_high >> shift, y_high >> shift);
+            needed.remove(&parent);
         }
     }
 
@@ -351,11 +362,9 @@ mod tests {
         MapConfig {
             reference_lat: 45.0,
             reference_lon: 10.0,
-            min_zoom: 0,
-            max_zoom: 0,
+            zoom_levels: vec![(0, 0)],
             tile_source_url: String::new(),
             cache_dir: String::new(),
-            tile_radius: 0,
             z_layer: 0.0,
         }
     }
