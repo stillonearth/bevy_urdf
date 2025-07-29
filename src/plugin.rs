@@ -50,10 +50,10 @@ where
     /// [`with_default_system_setup(false)`](Self::with_default_system_setup).
     pub fn get_systems(set: PhysicsSet) -> ScheduleConfigs<ScheduleSystem> {
         match set {
-            PhysicsSet::StepSimulation => ((switch_drone_physics, simulate_drone, simulate_uuv)
-                .chain())
-            .in_set(PhysicsSet::StepSimulation)
-            .into_configs(),
+            PhysicsSet::StepSimulation => (switch_drone_physics, simulate_drone, simulate_uuv)
+                .chain()
+                .in_set(PhysicsSet::StepSimulation)
+                .into_configs(),
             PhysicsSet::SyncBackend => (
                 handle_control_motors,
                 handle_control_thrusts,
