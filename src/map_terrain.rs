@@ -292,6 +292,7 @@ fn spawn_tile(
         Transform::from_xyz(center.x, config.z_layer * z as f32, center.y),
         MapTile { z, x, y },
     ));
+    log::info!("Spawned map tile z:{} x:{} y:{}", z, x, y);
 }
 
 fn download_tiles(
@@ -336,6 +337,10 @@ fn download_tiles(
             .replace("{z}", &req.z.to_string())
             .replace("{x}", &req.x.to_string())
             .replace("{y}", &req.y.to_string());
+        log::info!(
+            "Requesting tile z:{} x:{} y:{} from {}",
+            req.z, req.x, req.y, url
+        );
 
         let hm_url = config.heightmap_source_url.as_ref().map(|u| {
             u.replace("{z}", &req.z.to_string())
@@ -348,12 +353,43 @@ fn download_tiles(
         let x = req.x;
         let y = req.y;
 
-        ehttp::fetch(Request::get(url), move |result| {
-            let image_bytes = result.ok().map(|r| r.bytes);
+        ehttp::fetch(Request::get(url.clone()), move |result| {
+            let image_bytes = match result {
+                Ok(resp) => {
+                    log::info!(
+                        "Downloaded tile z:{} x:{} y:{} status {}",
+                        z, x, y, resp.status
+                    );
+                    Some(resp.bytes)
+                }
+                Err(err) => {
+                    log::error!(
+                        "Failed to download tile z:{} x:{} y:{} from {}: {}",
+                        z, x, y, url, err
+                    );
+                    None
+                }
+            };
             if let Some(hurl) = hm_url {
                 let tx2 = tx.clone();
+                let hurl_clone = hurl.clone();
                 ehttp::fetch(Request::get(hurl), move |hres| {
-                    let height_bytes = hres.ok().map(|r| r.bytes);
+                    let height_bytes = match hres {
+                        Ok(resp) => {
+                            log::info!(
+                                "Downloaded heightmap z:{} x:{} y:{} status {}",
+                                z, x, y, resp.status
+                            );
+                            Some(resp.bytes)
+                        }
+                        Err(err) => {
+                            log::error!(
+                                "Failed to download heightmap z:{} x:{} y:{} from {}: {}",
+                                z, x, y, hurl_clone, err
+                            );
+                            None
+                        }
+                    };
                     let _ = tx2.send(TileResponse {
                         z,
                         x,
@@ -391,9 +427,13 @@ fn process_downloads(
             {
                 let path = tile_cache_path(res.z, res.x, res.y, &config);
                 if let Some(dir) = Path::new(&path).parent() {
-                    if std::fs::create_dir_all(dir).is_ok() {
-                        let _ = std::fs::write(&path, &bytes);
+                    if let Err(e) = std::fs::create_dir_all(dir) {
+                        log::error!("Failed to create cache dir {}: {}", dir.display(), e);
                     }
+                }
+                match std::fs::write(&path, &bytes) {
+                    Ok(_) => log::info!("Cached tile z:{} x:{} y:{} at {}", res.z, res.x, res.y, path),
+                    Err(e) => log::error!("Failed to write tile z:{} x:{} y:{} to {}: {}", res.z, res.x, res.y, path, e),
                 }
             }
         }
@@ -407,9 +447,23 @@ fn process_downloads(
                         .replace("{x}", &res.x.to_string())
                         .replace("{y}", &res.y.to_string());
                     if let Some(dir) = Path::new(&path).parent() {
-                        if std::fs::create_dir_all(dir).is_ok() {
-                            let _ = std::fs::write(&path, &bytes);
+                        if let Err(e) = std::fs::create_dir_all(dir) {
+                            log::error!(
+                                "Failed to create heightmap cache dir {}: {}",
+                                dir.display(),
+                                e
+                            );
                         }
+                    }
+                    match std::fs::write(&path, &bytes) {
+                        Ok(_) => log::info!(
+                            "Cached heightmap z:{} x:{} y:{} at {}",
+                            res.z, res.x, res.y, path
+                        ),
+                        Err(e) => log::error!(
+                            "Failed to write heightmap z:{} x:{} y:{} to {}: {}",
+                            res.z, res.x, res.y, path, e
+                        ),
                     }
                 }
             }
