@@ -14,7 +14,7 @@ use bevy_rapier3d::{
 };
 use rapier3d::prelude::{Collider, MultibodyJointHandle, RigidBodyHandle};
 use rapier3d_urdf::UrdfRobotHandles;
-use urdf_rs::{Geometry, Pose};
+use urdf_rs::{Geometry, Link, Pose};
 
 use crate::{
     drones::{
@@ -160,54 +160,45 @@ pub struct URDFRobotRigidBodyHandle(pub RigidBodyHandle);
 
 // Plugin
 
+pub struct ExtractedGeometry {
+    pub index: usize,
+    pub geometries: Vec<Geometry>,
+    pub inertia_pose: Pose,
+    pub visual_poses: Vec<Pose>,
+    pub colliders: Vec<Collider>,
+    pub link: Link,
+}
+
 #[allow(clippy::type_complexity)]
-pub fn extract_robot_geometry(
-    robot: &UrdfAsset,
-) -> Vec<(
-    usize,
-    Option<Geometry>,
-    Pose,
-    Option<Pose>,
-    Option<Collider>,
-)> {
-    let mut result: Vec<(
-        usize,
-        Option<Geometry>,
-        Pose,
-        Option<Pose>,
-        Option<Collider>,
-    )> = Vec::new();
+pub fn extract_robot_geometry(robot: &UrdfAsset) -> Vec<ExtractedGeometry> {
+    robot
+        .robot
+        .links
+        .iter()
+        .enumerate()
+        .map(|(index, link)| {
+            let colliders = robot.urdf_robot.links[index].colliders.clone();
+            let geometries = link
+                .visual
+                .iter()
+                .map(|visual| visual.geometry.clone())
+                .collect();
+            let visual_poses = link
+                .visual
+                .iter()
+                .map(|visual| visual.origin.clone())
+                .collect();
 
-    for (i, link) in robot.robot.links.iter().enumerate() {
-        let colliders = robot.urdf_robot.links[i].colliders.clone();
-        let collider = if colliders.len() == 1 {
-            Some(colliders[0].clone())
-        } else {
-            None
-        };
-
-        let geometry = if !link.visual.is_empty() {
-            Some(link.visual[0].geometry.clone())
-        } else {
-            None
-        };
-        let inertia_pose = link.inertial.origin.clone();
-        let mut visual_pose: Option<Pose> = None;
-
-        if let Some(vp) = link.visual.last() {
-            visual_pose = Some(vp.origin.clone());
-        }
-
-        result.push((
-            i,
-            geometry.clone(),
-            inertia_pose.clone(),
-            visual_pose.clone(),
-            collider,
-        ));
-    }
-
-    result
+            ExtractedGeometry {
+                index,
+                geometries,
+                inertia_pose: link.inertial.origin.clone(),
+                visual_poses,
+                link: link.clone(),
+                colliders,
+            }
+        })
+        .collect()
 }
 
 fn sync_robot_geometry(
