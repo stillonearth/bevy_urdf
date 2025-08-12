@@ -2,6 +2,7 @@ use std::path::Path;
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
+use nalgebra::UnitQuaternion;
 use rapier3d::prelude::{InteractionGroups, MultibodyJointHandle, RigidBodyHandle};
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobotHandles};
 use uav::dynamics::RotorState;
@@ -12,6 +13,7 @@ use crate::{
         try_extract_drone_visual_and_dynamics_model_properties, DroneDescriptor, DroneRotor,
     },
     plugin::{extract_robot_geometry, URDFRobot, URDFRobotRigidBodyHandle},
+    rapier_to_bevy_rotation,
     urdf_asset_loader::{RpyAssetLoaderSettings, UrdfAsset},
     RobotType,
 };
@@ -193,7 +195,7 @@ pub(crate) fn handle_spawn_robot(
                 let mut rotor_index = 0;
                 for extracted_geometry in extracted_geometries {
                     let index = extracted_geometry.index;
-                    for geom in extracted_geometry.geometries {
+                    for (geom_index, geom) in extracted_geometry.geometries.iter().enumerate() {
                         let mesh_3d: Mesh3d = match geom {
                             urdf_rs::Geometry::Box { size } => Mesh3d(meshes.add(Cuboid::new(
                                 size[0] as f32 * 2.0,
@@ -203,7 +205,7 @@ pub(crate) fn handle_spawn_robot(
                             urdf_rs::Geometry::Cylinder { .. } => todo!(),
                             urdf_rs::Geometry::Capsule { .. } => todo!(),
                             urdf_rs::Geometry::Sphere { radius } => {
-                                Mesh3d(meshes.add(Sphere::new(radius as f32)))
+                                Mesh3d(meshes.add(Sphere::new(*radius as f32)))
                             }
                             urdf_rs::Geometry::Mesh { filename, .. } => {
                                 let base_path = event.mesh_dir.as_str();
@@ -217,80 +219,110 @@ pub(crate) fn handle_spawn_robot(
                         let rapier_link = urdf.urdf_robot.links[index].clone();
                         let rapier_pos = rapier_link.body.position();
 
-                        let rapier_rot = rapier_pos.rotation;
-
-                        let quat_fix = Quat::from_rotation_z(std::f32::consts::PI);
-                        let bevy_quat = quat_fix
-                            * Quat::from_array([
-                                rapier_rot.i,
-                                rapier_rot.j,
-                                rapier_rot.k,
-                                rapier_rot.w,
-                            ]);
-
-                        let rapier_vec = Vec3::new(
+                        let mut rapier_body_rotation = rapier_pos.rotation.clone();
+                        let mut rapier_body_translation = Vec3::new(
                             rapier_pos.translation.x,
                             rapier_pos.translation.y,
                             rapier_pos.translation.z,
                         );
-                        let bevy_vec = quat_fix.mul_vec3(rapier_vec);
+                        if let Some(visual_pose) = extracted_geometry.visual_poses.get(geom_index) {
+                            let pose_translation = Vec3::new(
+                                visual_pose.xyz.0[0] as f32,
+                                visual_pose.xyz.0[1] as f32,
+                                visual_pose.xyz.0[2] as f32,
+                            );
+                            rapier_body_translation += pose_translation;
 
-                        let mut ec = children.spawn((
-                            mesh_3d,
-                            MeshMaterial3d(materials.add(Color::srgb(0.2, 0.8, 0.2))),
-                            URDFRobotRigidBodyHandle(body_handles[index]),
-                            RapierContextEntityLink(rapier_context_simulation_entity),
-                            Name::new(extracted_geometry.link.name.clone()),
-                        ));
+                            let pose_rotation = UnitQuaternion::from_euler_angles(
+                                visual_pose.rpy.0[0] as f32,
+                                visual_pose.rpy.0[1] as f32,
+                                visual_pose.rpy.0[2] as f32,
+                            );
 
-                        if let Some(drone_descriptor) = drone_descriptor.clone() {
-                            let adp = drone_descriptor.aerodynamic_props;
-                            let vbp = drone_descriptor.visual_body_properties;
-                            let dmp = drone_descriptor.dynamics_model_props;
+                            rapier_body_rotation = rapier_body_rotation * pose_rotation;
 
-                            if vbp.rotor_body_indices.contains(&index) {
-                                let max_thrust = adp.thrust2weight * dmp.mass * 9.81;
+                            let bevy_translation =
+                                rapier_to_bevy_rotation().mul_vec3(rapier_body_translation);
+                            let bevy_rotation = rapier_to_bevy_rotation()
+                                * Quat::from_array([
+                                    rapier_body_rotation.i,
+                                    rapier_body_rotation.j,
+                                    rapier_body_rotation.k,
+                                    rapier_body_rotation.w,
+                                ]);
 
-                                let rotor_state =
-                                    RotorState::new(max_thrust, max_thrust * 2.0, adp.kf, adp.km);
+                            let mut ec = children.spawn((
+                                mesh_3d,
+                                MeshMaterial3d(materials.add(Color::srgb(0.2, 0.8, 0.2))),
+                                URDFRobotRigidBodyHandle {
+                                    rigid_body_handle: body_handles[index],
+                                    visual_pose: visual_pose.clone(),
+                                },
+                                RapierContextEntityLink(rapier_context_simulation_entity),
+                                Name::new(format!(
+                                    "{} part {} / {}",
+                                    extracted_geometry.link.name.clone(),
+                                    geom_index + 1,
+                                    extracted_geometry.geometries.len(),
+                                )),
+                            ));
 
-                                let transform = if let Some(visual_rotor_position) =
-                                    vbp.rotor_positions.get(rotor_index)
-                                {
-                                    Transform::from_translation(*visual_rotor_position)
-                                        .with_rotation(bevy_quat)
-                                } else {
-                                    Transform::from_translation(bevy_vec).with_rotation(bevy_quat)
-                                };
+                            if let Some(drone_descriptor) = drone_descriptor.clone() {
+                                let adp = drone_descriptor.aerodynamic_props;
+                                let vbp = drone_descriptor.visual_body_properties;
+                                let dmp = drone_descriptor.dynamics_model_props;
 
-                                ec.insert(DroneRotor {
-                                    state: rotor_state,
-                                    transform: transform,
-                                    rotor_index,
-                                });
-                                rotor_index += 1;
+                                if vbp.rotor_body_indices.contains(&index) {
+                                    let max_thrust = adp.thrust2weight * dmp.mass * 9.81;
 
+                                    let rotor_state = RotorState::new(
+                                        max_thrust,
+                                        max_thrust * 2.0,
+                                        adp.kf,
+                                        adp.km,
+                                    );
+
+                                    let transform = if let Some(visual_rotor_position) =
+                                        vbp.rotor_positions.get(rotor_index)
+                                    {
+                                        Transform::from_translation(*visual_rotor_position)
+                                            .with_rotation(bevy_rotation)
+                                    } else {
+                                        Transform::from_translation(bevy_translation)
+                                            .with_rotation(bevy_rotation)
+                                    };
+
+                                    ec.insert(DroneRotor {
+                                        state: rotor_state,
+                                        transform: transform,
+                                        rotor_index,
+                                    });
+                                    rotor_index += 1;
+
+                                    ec.insert(transform);
+                                }
+                            } else {
+                                let transform = Transform::from_translation(bevy_translation)
+                                    .with_rotation(bevy_rotation);
                                 ec.insert(transform);
                             }
-                        } else {
-                            let transform =
-                                Transform::from_translation(bevy_vec).with_rotation(bevy_quat);
-                            ec.insert(transform);
-                        }
 
-                        // insert entity id to collider data, otherwise it breaks in debug mode
-                        let entity_id = ec.id().index();
-                        for (_entity, mut rigid_body_set, mut collider_set, _) in
-                            q_rapier_context.iter_mut()
-                        {
-                            if let Some(rigid_body) =
-                                rigid_body_set.bodies.get_mut(body_handles[index])
+                            // insert entity id to collider data, otherwise it breaks in debug mode
+                            let entity_id = ec.id().index();
+                            for (_entity, mut rigid_body_set, mut collider_set, _) in
+                                q_rapier_context.iter_mut()
                             {
-                                let collider_handles = rigid_body.colliders();
-                                for collider_handle in collider_handles.iter() {
-                                    let collider =
-                                        collider_set.colliders.get_mut(*collider_handle).unwrap();
-                                    collider.user_data = entity_id as u128;
+                                if let Some(rigid_body) =
+                                    rigid_body_set.bodies.get_mut(body_handles[index])
+                                {
+                                    let collider_handles = rigid_body.colliders();
+                                    for collider_handle in collider_handles.iter() {
+                                        let collider = collider_set
+                                            .colliders
+                                            .get_mut(*collider_handle)
+                                            .unwrap();
+                                        collider.user_data = entity_id as u128;
+                                    }
                                 }
                             }
                         }

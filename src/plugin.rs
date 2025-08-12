@@ -12,6 +12,7 @@ use bevy_rapier3d::{
     plugin::{NoUserData, PhysicsSet},
     prelude::{BevyPhysicsHooks, RapierContextJoints, RapierRigidBodySet},
 };
+use nalgebra::UnitQuaternion;
 use rapier3d::prelude::{Collider, MultibodyJointHandle, RigidBodyHandle};
 use rapier3d_urdf::UrdfRobotHandles;
 use urdf_rs::{Geometry, Link, Pose};
@@ -114,6 +115,10 @@ impl Plugin for UrdfPlugin {
     }
 }
 
+pub(crate) fn rapier_to_bevy_rotation() -> Quat {
+    Quat::from_rotation_z(std::f32::consts::PI) * Quat::from_rotation_y(std::f32::consts::PI)
+}
+
 // Components
 
 #[derive(Component)]
@@ -155,8 +160,11 @@ impl From<&str> for RobotType {
     }
 }
 
-#[derive(Component, Default, Deref)]
-pub struct URDFRobotRigidBodyHandle(pub RigidBodyHandle);
+#[derive(Component)]
+pub struct URDFRobotRigidBodyHandle {
+    pub rigid_body_handle: RigidBodyHandle,
+    pub visual_pose: Pose,
+}
 
 // Plugin
 
@@ -205,27 +213,49 @@ fn sync_robot_geometry(
     mut q_rapier_robot_bodies: Query<(Entity, &mut Transform, &mut URDFRobotRigidBodyHandle)>,
     q_rapier_rigid_body_set: Query<(&RapierRigidBodySet,)>,
 ) {
+    // return;
     for rapier_rigid_body_set in q_rapier_rigid_body_set.iter() {
         for (_, mut transform, body_handle) in q_rapier_robot_bodies.iter_mut() {
-            if let Some(robot_body) = rapier_rigid_body_set.0.bodies.get(body_handle.0) {
-                let rapier_pos = robot_body.position();
-                let rapier_rot = rapier_pos.rotation;
+            if let Some(robot_body) = rapier_rigid_body_set
+                .0
+                .bodies
+                .get(body_handle.rigid_body_handle)
+            {
+                let body_translation = robot_body.position().translation.vector;
+                let mut body_translation =
+                    Vec3::new(body_translation.x, body_translation.y, body_translation.z);
+                let mut body_rotation = robot_body.position().rotation;
+                let visual_pose = body_handle.visual_pose.clone();
 
-                let quat_fix = Quat::from_rotation_z(std::f32::consts::PI)
-                    * Quat::from_rotation_y(std::f32::consts::PI);
-                let bevy_quat = quat_fix
-                    * Quat::from_array([rapier_rot.i, rapier_rot.j, rapier_rot.k, rapier_rot.w]);
-
-                let rapier_vec = Vec3::new(
-                    rapier_pos.translation.x,
-                    rapier_pos.translation.y,
-                    rapier_pos.translation.z,
+                let pose_translation = Vec3::new(
+                    visual_pose.xyz.0[0] as f32,
+                    visual_pose.xyz.0[1] as f32,
+                    visual_pose.xyz.0[2] as f32,
                 );
 
-                let bevy_vec = quat_fix.mul_vec3(rapier_vec);
-                let body_transform = Transform::from_translation(bevy_vec).with_rotation(bevy_quat);
+                let pose_rotation = UnitQuaternion::from_euler_angles(
+                    visual_pose.rpy.0[0] as f32,
+                    visual_pose.rpy.0[1] as f32,
+                    visual_pose.rpy.0[2] as f32,
+                );
 
-                *transform = body_transform;
+                body_translation += pose_translation;
+                body_rotation = body_rotation * pose_rotation;
+
+                let bevy_rotation = rapier_to_bevy_rotation()
+                    * Quat::from_array([
+                        body_rotation.i,
+                        body_rotation.j,
+                        body_rotation.k,
+                        body_rotation.w,
+                    ]);
+
+                let rapier_translation =
+                    Vec3::new(body_translation.x, body_translation.y, body_translation.z);
+
+                let bevy_translation = rapier_to_bevy_rotation().mul_vec3(rapier_translation);
+                *transform =
+                    Transform::from_translation(bevy_translation).with_rotation(bevy_rotation);
             }
         }
     }
@@ -251,8 +281,7 @@ fn adjust_urdf_robot_mean_position(
         }
     }
 
-    let quat_fix =
-        Quat::from_rotation_z(std::f32::consts::PI) * Quat::from_rotation_y(std::f32::consts::PI);
+    let quat_fix = Quat::from_rotation_z(std::f32::consts::PI);
     let mut mean_translations: HashMap<Handle<UrdfAsset>, Vec3> = HashMap::new();
 
     // Calculate mean translation for each URDF asset
