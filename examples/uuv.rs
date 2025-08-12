@@ -12,7 +12,7 @@ use bevy_urdf::events::{ControlThrusters, LoadRobot, RapierOption, RobotLoaded, 
 use bevy_urdf::plugin::{RobotType, UrdfPlugin};
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
 use bevy_urdf::{CameraControlPlugin, RotateCamera};
-use bevy_urdf::{MapConfig, MapTerrainPlugin};
+use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
 fn main() {
     App::new()
@@ -29,18 +29,7 @@ fn main() {
             EguiPlugin {
                 enable_multipass_for_primary_context: true,
             },
-            MapTerrainPlugin::new(MapConfig {
-                // Reference point for Newport Harbor (approx.)
-                reference_lat: 41.61906,
-                reference_lon: -71.20932,
-                // Highest zoom first; radius in tiles around the UUV
-                zoom_levels: vec![(16, 1), (15, 2)],
-                tile_source_url: "https://tiles.gebco.net/tiles/{z}/{x}/{y}.png".to_string(),
-                heightmap_source_url: None,
-                height_scale: 1.0,
-                cache_dir: "assets/tiles".to_string(),
-                z_layer: 0.0,
-            }),
+            InfiniteGridPlugin,
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
             CameraControlPlugin,
         ))
@@ -112,6 +101,15 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
         brightness: 300.0,
         ..default()
     });
+
+    commands.spawn((
+        InfiniteGridBundle {
+            transform: Transform::from_xyz(0.0, -1.0, 0.0),
+            ..default()
+        },
+        RigidBody::Fixed,
+        Collider::cuboid(900., 0.05, 900.),
+    ));
 
     ew_load_robot.send(LoadRobot {
         robot_type: RobotType::Uuv,

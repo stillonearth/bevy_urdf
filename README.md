@@ -166,37 +166,9 @@ cargo run --example quadrotor --release
 # Quadruped robot simulation
 cargo run --example quadruped --release
 
-# Underwater vehicle simulation with map terrain
+# Underwater vehicle simulation
 cargo run --example uuv --release
 ```
-
-When using `MapTerrainPlugin` (for example in the `uuv` example), the Bevy `png`
-feature must be enabled so that PNG tile images can be loaded correctly.
-
-### Bathymetry Tiles and Starting Location
-
-`MapTerrainPlugin` works with any map tile service following the `{z}/{x}/{y}`
-pattern. To visualize underwater terrain, supply a bathymetry tile source and
-set the reference coordinates. The snippet below centers the map near
-`41.61906° N, 71.20932° W` using public GEBCO tiles:
-
-```rust
-MapTerrainPlugin::new(MapConfig {
-    reference_lat: 41.61906,
-    reference_lon: -71.20932,
-    zoom_levels: vec![(16, 1), (15, 2)],
-    tile_source_url: "https://tiles.gebco.net/tiles/{z}/{x}/{y}.png".to_string(),
-    heightmap_source_url: None,
-    height_scale: 1.0,
-    cache_dir: "assets/tiles".to_string(),
-    z_layer: 0.0,
-});
-```
-
-Replace the URL with your preferred bathymetry tile server. See the
-[GEBCO gridded bathymetry data](https://www.gebco.net/data-products/gridded-bathymetry-data)
-for details.
-
 ## URDF Requirements
 
 Before using URDF files with this plugin:
