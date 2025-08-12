@@ -204,6 +204,7 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
             create_colliders_from_visual_shapes: false,
             interaction_groups: None,
             translation_shift: Some(Vec3::new(0.0, 1.0, 0.0)),
+            make_roots_fixed: false,
         },
         drone_descriptor: None,
     });

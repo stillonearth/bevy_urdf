@@ -27,6 +27,7 @@ pub struct RpyAssetLoaderSettings {
     pub translation_shift: Option<Vec3>,
     pub create_colliders_from_visual_shapes: bool,
     pub create_colliders_from_collision_shapes: bool,
+    pub make_roots_fixed: bool,
 }
 
 #[non_exhaustive]
@@ -63,11 +64,11 @@ impl AssetLoader for RpyAssetLoader {
         }
 
         let options = UrdfLoaderOptions {
-            create_colliders_from_visual_shapes: true,
-            create_colliders_from_collision_shapes: false,
+            create_colliders_from_visual_shapes: settings.create_colliders_from_visual_shapes,
+            create_colliders_from_collision_shapes: settings.create_colliders_from_collision_shapes,
             enable_joint_collisions: false,
             apply_imported_mass_props: true,
-            make_roots_fixed: false,
+            make_roots_fixed: settings.make_roots_fixed,
             // Z-up to Y-up.
             shift: isometry,
             ..Default::default()

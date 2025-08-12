@@ -62,6 +62,7 @@ pub struct RapierOption {
     pub translation_shift: Option<Vec3>,
     pub create_colliders_from_visual_shapes: bool,
     pub create_colliders_from_collision_shapes: bool,
+    pub make_roots_fixed: bool,
 }
 
 #[derive(Clone, Event)]
@@ -128,7 +129,7 @@ pub(crate) fn handle_spawn_robot(
             {
                 let urdf_robot = urdf.urdf_robot.clone();
 
-                // do stuff if robot is a copter
+                // try extracting aerodynamic properties and consturct a drone descriptor if robot is a drone
                 if event.robot_type == RobotType::Drone && drone_descriptor.is_none() {
                     // extract model parameters automatically or fill manually if drone_descriptor is not none
                     let urdf_asset = urdf_assets.get(&event.handle).unwrap();
@@ -186,6 +187,7 @@ pub(crate) fn handle_spawn_robot(
                 },
                 Transform::IDENTITY.with_rotation(Quat::from_rotation_x(std::f32::consts::PI)),
                 InheritedVisibility::VISIBLE,
+                Name::new("urdf-defined robot"),
             ))
             .with_children(|children| {
                 let mut rotor_index = 0;
@@ -238,6 +240,7 @@ pub(crate) fn handle_spawn_robot(
                             MeshMaterial3d(materials.add(Color::srgb(0.2, 0.8, 0.2))),
                             URDFRobotRigidBodyHandle(body_handles[index]),
                             RapierContextEntityLink(rapier_context_simulation_entity),
+                            Name::new(extracted_geometry.link.name.clone()),
                         ));
 
                         if let Some(drone_descriptor) = drone_descriptor.clone() {
@@ -248,13 +251,8 @@ pub(crate) fn handle_spawn_robot(
                             if vbp.rotor_body_indices.contains(&index) {
                                 let max_thrust = adp.thrust2weight * dmp.mass * 9.81;
 
-                                let rotor_state = RotorState::new(
-                                    // todo: get 9.81 from config
-                                    max_thrust,
-                                    max_thrust * 2.0,
-                                    adp.kf,
-                                    adp.km,
-                                );
+                                let rotor_state =
+                                    RotorState::new(max_thrust, max_thrust * 2.0, adp.kf, adp.km);
 
                                 let transform = if let Some(visual_rotor_position) =
                                     vbp.rotor_positions.get(rotor_index)
@@ -375,6 +373,7 @@ pub(crate) fn handle_load_robot(
             event.rapier_options.create_colliders_from_collision_shapes;
         let create_colliders_from_visual_shapes =
             event.rapier_options.create_colliders_from_visual_shapes;
+        let make_roots_fixed = event.rapier_options.make_roots_fixed;
         let translation_shift = event.rapier_options.translation_shift;
         let mesh_dir = Some(event.clone().mesh_dir);
         let robot_handle: Handle<UrdfAsset> =
@@ -385,6 +384,7 @@ pub(crate) fn handle_load_robot(
                     interaction_groups,
                     create_colliders_from_collision_shapes,
                     create_colliders_from_visual_shapes,
+                    make_roots_fixed,
                 }
             });
 
