@@ -116,8 +116,10 @@ impl Plugin for UrdfPlugin {
 }
 
 pub(crate) fn rapier_to_bevy_rotation() -> Quat {
-    Quat::IDENTITY
+    // Quat::IDENTITY
     // Quat::from_rotation_z(std::f32::consts::PI) * Quat::from_rotation_y(-std::f32::consts::PI)
+
+    Quat::from_rotation_z(std::f32::consts::PI) * Quat::from_rotation_y(std::f32::consts::PI)
 }
 
 // Components
