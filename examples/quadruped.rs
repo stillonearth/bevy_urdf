@@ -187,7 +187,7 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
     // Scene
     commands.insert_resource(AmbientLight {
         color: WHITE.into(),
-        brightness: 300.0,
+        brightness: 500.0,
         ..default()
     });
 
@@ -209,8 +209,8 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
         rapier_options: RapierOption {
             interaction_groups: None,
             translation_shift: Some(Vec3::new(0.0, 5.0, 0.0)),
-            create_colliders_from_visual_shapes: true,
-            create_colliders_from_collision_shapes: false,
+            create_colliders_from_visual_shapes: false,
+            create_colliders_from_collision_shapes: true,
             make_roots_fixed: false,
         },
         marker: None,

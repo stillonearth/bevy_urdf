@@ -193,14 +193,14 @@ pub(crate) fn handle_spawn_robot(
             ))
             .with_children(|children| {
                 let mut rotor_index = 0;
-                for extracted_geometry in extracted_geometries {
+                for (_eg_index, extracted_geometry) in extracted_geometries.iter().enumerate() {
                     let index = extracted_geometry.index;
                     for (geom_index, geom) in extracted_geometry.geometries.iter().enumerate() {
                         let mesh_3d: Mesh3d = match geom {
                             urdf_rs::Geometry::Box { size } => Mesh3d(meshes.add(Cuboid::new(
                                 size[0] as f32 * 2.0,
-                                size[2] as f32 * 2.0,
                                 size[1] as f32 * 2.0,
+                                size[2] as f32 * 2.0,
                             ))),
                             urdf_rs::Geometry::Cylinder { .. } => todo!(),
                             urdf_rs::Geometry::Capsule { .. } => todo!(),
@@ -225,13 +225,20 @@ pub(crate) fn handle_spawn_robot(
                             rapier_pos.translation.y,
                             rapier_pos.translation.z,
                         );
+                        let bevy_rapier_body_rotation = Quat::from_array([
+                            rapier_body_rotation.i,
+                            rapier_body_rotation.j,
+                            rapier_body_rotation.k,
+                            rapier_body_rotation.w,
+                        ]);
+
                         if let Some(visual_pose) = extracted_geometry.visual_poses.get(geom_index) {
                             let pose_translation = Vec3::new(
                                 visual_pose.xyz.0[0] as f32,
                                 visual_pose.xyz.0[1] as f32,
                                 visual_pose.xyz.0[2] as f32,
                             );
-                            rapier_body_translation += pose_translation;
+                            rapier_body_translation += bevy_rapier_body_rotation * pose_translation;
 
                             let pose_rotation = UnitQuaternion::from_euler_angles(
                                 visual_pose.rpy.0[0] as f32,

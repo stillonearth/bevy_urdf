@@ -47,3 +47,4 @@ actix-web = "4.4"
 tokio = { version = "1.0", features = ["full"] }
 env_logger = "0.10"
 bevy_infinite_grid = { git = "https://github.com/ForesightMiningSoftwareCorporation/bevy_infinite_grid", branch = "main" }
+bevy_panorbit_camera = {version = "0.27", features = ["bevy_egui"] }

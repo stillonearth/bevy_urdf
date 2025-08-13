@@ -65,7 +65,7 @@ where
             PhysicsSet::Writeback => ((
                 sync_robot_geometry,
                 render_drone_rotors,
-                adjust_urdf_robot_mean_position,
+                // adjust_urdf_robot_mean_position,
             )
                 .chain())
             .in_set(PhysicsSet::Writeback)
@@ -116,7 +116,8 @@ impl Plugin for UrdfPlugin {
 }
 
 pub(crate) fn rapier_to_bevy_rotation() -> Quat {
-    Quat::from_rotation_z(std::f32::consts::PI) * Quat::from_rotation_y(std::f32::consts::PI)
+    Quat::IDENTITY
+    // Quat::from_rotation_z(std::f32::consts::PI) * Quat::from_rotation_x(-std::f32::consts::PI / 2.0)
 }
 
 // Components
@@ -213,7 +214,7 @@ fn sync_robot_geometry(
     mut q_rapier_robot_bodies: Query<(Entity, &mut Transform, &mut URDFRobotRigidBodyHandle)>,
     q_rapier_rigid_body_set: Query<(&RapierRigidBodySet,)>,
 ) {
-    // return;
+    return;
     for rapier_rigid_body_set in q_rapier_rigid_body_set.iter() {
         for (_, mut transform, body_handle) in q_rapier_robot_bodies.iter_mut() {
             if let Some(robot_body) = rapier_rigid_body_set
