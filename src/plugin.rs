@@ -216,7 +216,7 @@ fn sync_robot_geometry(
     mut q_rapier_robot_bodies: Query<(Entity, &mut Transform, &mut URDFRobotRigidBodyHandle)>,
     q_rapier_rigid_body_set: Query<(&RapierRigidBodySet,)>,
 ) {
-    // return;
+    return;
     for rapier_rigid_body_set in q_rapier_rigid_body_set.iter() {
         for (_, mut transform, body_handle) in q_rapier_robot_bodies.iter_mut() {
             if let Some(robot_body) = rapier_rigid_body_set
@@ -252,6 +252,14 @@ fn sync_robot_geometry(
 
                 body_translation += bevy_rotation * pose_translation;
                 body_rotation = body_rotation * pose_rotation_rapier;
+
+                let bevy_rotation = rapier_to_bevy_rotation()
+                    * Quat::from_array([
+                        body_rotation.i,
+                        body_rotation.j,
+                        body_rotation.k,
+                        body_rotation.w,
+                    ]);
 
                 let rapier_translation =
                     Vec3::new(body_translation.x, body_translation.y, body_translation.z);

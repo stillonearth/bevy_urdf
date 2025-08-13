@@ -208,7 +208,7 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
         mesh_dir: "assets/robots/unitree_a1/urdf/".to_string(),
         rapier_options: RapierOption {
             interaction_groups: None,
-            translation_shift: Some(Vec3::new(0.0, 5.0, 0.0)),
+            translation_shift: Some(Vec3::new(0.0, 1.0, 0.0)),
             create_colliders_from_visual_shapes: false,
             create_colliders_from_collision_shapes: true,
             make_roots_fixed: false,
