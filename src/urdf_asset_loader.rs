@@ -54,10 +54,22 @@ impl AssetLoader for RpyAssetLoader {
 
         // Z-up to Y-up.
         let mut isometry: nalgebra::Isometry<f32, nalgebra::Unit<nalgebra::Quaternion<f32>>, 3> =
-            Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2)
-                * Isometry::rotation(Vector::z() * std::f32::consts::PI);
+            Isometry::rotation(Vector::z() * std::f32::consts::PI)
+                * Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2);
+
+        // Isometry::rotation(Vector::x() * -std::f32::consts::FRAC_PI_2);
+
         // Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2)
-        //     * Isometry::rotation(Vector::y() * std::f32::consts::PI);
+        // * Isometry::rotation(Vector::y() * std::f32::consts::FRAC_PI_2 * 2.0);
+
+        // Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2);
+
+        // Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2)
+        // * Isometry::rotation(Vector::z() * std::f32::consts::PI);
+
+        // Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2)
+        // * Isometry::rotation(Vector::y() * std::f32::consts::PI);
+
         if let Some(translaction_shift) = settings.translation_shift {
             isometry.append_translation_mut(&Translation3::new(
                 translaction_shift.x,
@@ -72,7 +84,7 @@ impl AssetLoader for RpyAssetLoader {
             enable_joint_collisions: false,
             apply_imported_mass_props: true,
             make_roots_fixed: settings.make_roots_fixed,
-            shift: isometry,
+            // shift: isometry,
             ..Default::default()
         };
 

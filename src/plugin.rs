@@ -117,7 +117,7 @@ impl Plugin for UrdfPlugin {
 
 pub(crate) fn rapier_to_bevy_rotation() -> Quat {
     Quat::IDENTITY
-    // Quat::from_rotation_z(std::f32::consts::PI) * Quat::from_rotation_x(-std::f32::consts::PI / 2.0)
+    // Quat::from_rotation_z(std::f32::consts::PI) * Quat::from_rotation_y(-std::f32::consts::PI)
 }
 
 // Components
@@ -214,7 +214,7 @@ fn sync_robot_geometry(
     mut q_rapier_robot_bodies: Query<(Entity, &mut Transform, &mut URDFRobotRigidBodyHandle)>,
     q_rapier_rigid_body_set: Query<(&RapierRigidBodySet,)>,
 ) {
-    return;
+    // return;
     for rapier_rigid_body_set in q_rapier_rigid_body_set.iter() {
         for (_, mut transform, body_handle) in q_rapier_robot_bodies.iter_mut() {
             if let Some(robot_body) = rapier_rigid_body_set
@@ -234,14 +234,11 @@ fn sync_robot_geometry(
                     visual_pose.xyz.0[2] as f32,
                 );
 
-                let pose_rotation = UnitQuaternion::from_euler_angles(
+                let pose_rotation_rapier = UnitQuaternion::from_euler_angles(
                     visual_pose.rpy.0[0] as f32,
                     visual_pose.rpy.0[1] as f32,
                     visual_pose.rpy.0[2] as f32,
                 );
-
-                body_translation += pose_translation;
-                body_rotation = body_rotation * pose_rotation;
 
                 let bevy_rotation = rapier_to_bevy_rotation()
                     * Quat::from_array([
@@ -250,6 +247,9 @@ fn sync_robot_geometry(
                         body_rotation.k,
                         body_rotation.w,
                     ]);
+
+                body_translation += bevy_rotation * pose_translation;
+                body_rotation = body_rotation * pose_rotation_rapier;
 
                 let rapier_translation =
                     Vec3::new(body_translation.x, body_translation.y, body_translation.z);
