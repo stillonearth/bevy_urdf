@@ -3,7 +3,7 @@ use std::path::Path;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use nalgebra::UnitQuaternion;
-use rapier3d::prelude::{InteractionGroups, MultibodyJointHandle, RigidBodyHandle};
+use rapier3d::prelude::{InteractionGroups, MultibodyJointHandle, RigidBodyHandle, RigidBodySet};
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobotHandles};
 use uav::dynamics::RotorState;
 
@@ -125,6 +125,8 @@ pub(crate) fn handle_spawn_robot(
             let mut maybe_rapier_handles: Option<UrdfRobotHandles<Option<MultibodyJointHandle>>> =
                 None;
 
+            let mut rigid_body_set_after_insertion = RigidBodySet::new();
+
             // let mut handles: Option<UrdfRobotHandles<ImpulseJointHandle>> = None;
             for (_entity, mut rigid_body_set, mut collider_set, mut multibidy_joint_set) in
                 q_rapier_context.iter_mut()
@@ -156,6 +158,8 @@ pub(crate) fn handle_spawn_robot(
                     &mut multibidy_joint_set.multibody_joints,
                     UrdfMultibodyOptions::DISABLE_SELF_CONTACTS,
                 ));
+
+                rigid_body_set_after_insertion = rigid_body_set.bodies.clone();
 
                 break;
             }
@@ -194,9 +198,9 @@ pub(crate) fn handle_spawn_robot(
             .with_children(|children| {
                 let mut rotor_index = 0;
                 for (eg_index, extracted_geometry) in extracted_geometries.iter().enumerate() {
-                    if eg_index != 0 {
-                        continue;
-                    }
+                    // if eg_index != 0 {
+                    //     continue;
+                    // }
 
                     let index = extracted_geometry.index;
                     for (geom_index, geom) in extracted_geometry.geometries.iter().enumerate() {
@@ -220,8 +224,12 @@ pub(crate) fn handle_spawn_robot(
                             }
                         };
 
-                        let rapier_link = urdf.urdf_robot.links[index].clone();
-                        let rapier_pos = rapier_link.body.position();
+                        // let rapier_link = urdf.urdf_robot.links[index].clone();
+                        let rb = rigid_body_set_after_insertion
+                            .get(body_handles[index])
+                            .unwrap();
+                        // let rapier_pos = rapier_link.body.position();
+                        let rapier_pos = rb.position();
 
                         let mut rapier_body_rotation = rapier_pos.rotation.clone();
                         let mut rapier_body_translation = Vec3::new(
