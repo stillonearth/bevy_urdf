@@ -194,8 +194,8 @@ pub(crate) fn handle_spawn_robot(
             .with_children(|children| {
                 let mut rotor_index = 0;
                 for (eg_index, extracted_geometry) in extracted_geometries.iter().enumerate() {
-                    if eg_index < 4 {
-                        // continue;
+                    if eg_index != 0 {
+                        continue;
                     }
 
                     let index = extracted_geometry.index;
