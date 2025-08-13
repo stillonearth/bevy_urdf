@@ -191,7 +191,7 @@ pub(crate) fn handle_spawn_robot(
                     rapier_handles,
                     robot_type: event.robot_type,
                 },
-                Transform::IDENTITY.with_rotation(Quat::from_rotation_x(std::f32::consts::PI)),
+                Transform::IDENTITY, //.with_rotation(Quat::from_rotation_x(std::f32::consts::PI)),
                 InheritedVisibility::VISIBLE,
                 Name::new("urdf-defined robot"),
             ))
@@ -250,7 +250,6 @@ pub(crate) fn handle_spawn_robot(
                                 visual_pose.xyz.0[1] as f32,
                                 visual_pose.xyz.0[2] as f32,
                             );
-                            rapier_body_translation += bevy_rapier_body_rotation * pose_translation;
 
                             let pose_rotation = UnitQuaternion::from_euler_angles(
                                 visual_pose.rpy.0[0] as f32,
@@ -258,6 +257,7 @@ pub(crate) fn handle_spawn_robot(
                                 visual_pose.rpy.0[2] as f32,
                             );
 
+                            rapier_body_translation += bevy_rapier_body_rotation * pose_translation;
                             rapier_body_rotation = rapier_body_rotation * pose_rotation;
 
                             let bevy_translation =

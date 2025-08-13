@@ -57,7 +57,7 @@ impl AssetLoader for RpyAssetLoader {
             // Isometry::rotation(Vector::x() * -std::f32::consts::FRAC_PI_2);
         Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2)
         * Isometry::rotation(Vector::y() * std::f32::consts::FRAC_PI_2 * 2.0)
-        * Isometry::rotation(-Vector::z() * std::f32::consts::PI * 0.0);
+        * Isometry::rotation(-Vector::z() * std::f32::consts::PI / 2.0);
 
         if let Some(translaction_shift) = settings.translation_shift {
             isometry.append_translation_mut(&Translation3::new(
