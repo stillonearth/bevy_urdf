@@ -18,6 +18,7 @@ pub struct UrdfAsset {
     pub robot: Robot,
     pub urdf_robot: UrdfRobot,
     pub xml_string: String,
+    pub isometry: nalgebra::Isometry<f32, nalgebra::Unit<nalgebra::Quaternion<f32>>, 3>,
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
@@ -54,10 +55,10 @@ impl AssetLoader for RpyAssetLoader {
 
         // Z-up to Y-up.
         let mut isometry: nalgebra::Isometry<f32, nalgebra::Unit<nalgebra::Quaternion<f32>>, 3> =
-            // Isometry::rotation(Vector::x() * -std::f32::consts::FRAC_PI_2);
-        Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2)
-        * Isometry::rotation(Vector::y() * std::f32::consts::FRAC_PI_2 * 2.0)
-        * Isometry::rotation(-Vector::z() * std::f32::consts::PI / 2.0);
+            Isometry::rotation(Vector::x() * -std::f32::consts::FRAC_PI_2);
+        // Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2)
+        // * Isometry::rotation(Vector::y() * std::f32::consts::FRAC_PI_2 * 2.0)
+        // * Isometry::rotation(-Vector::z() * std::f32::consts::PI / 2.0);
 
         if let Some(translaction_shift) = settings.translation_shift {
             isometry.append_translation_mut(&Translation3::new(
@@ -114,6 +115,7 @@ impl AssetLoader for RpyAssetLoader {
             robot,
             urdf_robot,
             xml_string: String::from(content),
+            isometry: isometry,
         })
     }
 }

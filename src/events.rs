@@ -2,7 +2,7 @@ use std::path::Path;
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use nalgebra::UnitQuaternion;
+use nalgebra::{Quaternion, UnitQuaternion};
 use rapier3d::prelude::{InteractionGroups, MultibodyJointHandle, RigidBodyHandle, RigidBodySet};
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobotHandles};
 use uav::dynamics::RotorState;
@@ -12,6 +12,7 @@ use crate::{
         try_extract_drone_aerodynamics_properties,
         try_extract_drone_visual_and_dynamics_model_properties, DroneDescriptor, DroneRotor,
     },
+    kinematics::get_link_transforms,
     plugin::{extract_robot_geometry, URDFRobot, URDFRobotRigidBodyHandle},
     rapier_to_bevy_rotation,
     urdf_asset_loader::{RpyAssetLoaderSettings, UrdfAsset},
@@ -121,17 +122,18 @@ pub(crate) fn handle_spawn_robot(
         let robot_handle = event.handle.clone();
         let mut drone_descriptor = event.drone_descriptor.clone();
 
-        if let Some(urdf) = urdf_assets.get(robot_handle.id()) {
+        if let Some(urdf_asset) = urdf_assets.get(robot_handle.id()) {
             let mut maybe_rapier_handles: Option<UrdfRobotHandles<Option<MultibodyJointHandle>>> =
                 None;
 
-            let mut rigid_body_set_after_insertion = RigidBodySet::new();
+            let kinematic_transforms =
+                get_link_transforms(&urdf_asset.robot, urdf_asset.isometry).unwrap();
 
             // let mut handles: Option<UrdfRobotHandles<ImpulseJointHandle>> = None;
             for (_entity, mut rigid_body_set, mut collider_set, mut multibidy_joint_set) in
                 q_rapier_context.iter_mut()
             {
-                let urdf_robot = urdf.urdf_robot.clone();
+                let urdf_robot = urdf_asset.urdf_robot.clone();
 
                 // try extracting aerodynamic properties and consturct a drone descriptor if robot is a drone
                 if event.robot_type == RobotType::Drone && drone_descriptor.is_none() {
@@ -159,8 +161,6 @@ pub(crate) fn handle_spawn_robot(
                     UrdfMultibodyOptions::DISABLE_SELF_CONTACTS,
                 ));
 
-                rigid_body_set_after_insertion = rigid_body_set.bodies.clone();
-
                 break;
             }
 
@@ -171,7 +171,7 @@ pub(crate) fn handle_spawn_robot(
             let rapier_handles = maybe_rapier_handles.unwrap();
             let body_handles: Vec<RigidBodyHandle> =
                 rapier_handles.links.iter().map(|link| link.body).collect();
-            let extracted_geometries = extract_robot_geometry(urdf);
+            let extracted_geometries = extract_robot_geometry(urdf_asset);
 
             assert_eq!(body_handles.len(), extracted_geometries.len());
 
@@ -191,17 +191,13 @@ pub(crate) fn handle_spawn_robot(
                     rapier_handles,
                     robot_type: event.robot_type,
                 },
-                Transform::IDENTITY, //.with_rotation(Quat::from_rotation_x(std::f32::consts::PI)),
+                Transform::IDENTITY,
                 InheritedVisibility::VISIBLE,
-                Name::new("urdf-defined robot"),
+                Name::new("URDF Robot"),
             ))
             .with_children(|children| {
                 let mut rotor_index = 0;
-                for (eg_index, extracted_geometry) in extracted_geometries.iter().enumerate() {
-                    // if eg_index != 0 {
-                    //     continue;
-                    // }
-
+                for (_eg_index, extracted_geometry) in extracted_geometries.iter().enumerate() {
                     let index = extracted_geometry.index;
                     for (geom_index, geom) in extracted_geometry.geometries.iter().enumerate() {
                         let mesh_3d: Mesh3d = match geom {
@@ -224,123 +220,124 @@ pub(crate) fn handle_spawn_robot(
                             }
                         };
 
-                        // let rapier_link = urdf.urdf_robot.links[index].clone();
-                        let rb = rigid_body_set_after_insertion
-                            .get(body_handles[index])
-                            .unwrap();
-                        // let rapier_pos = rapier_link.body.position();
-                        let rapier_pos = rb.position();
+                        if let Some(link_transform) =
+                            kinematic_transforms.get(&extracted_geometry.link.name)
+                        {
+                            let mut rapier_body_rotation = link_transform.rotation;
 
-                        let mut rapier_body_rotation = rapier_pos.rotation.clone();
-                        let mut rapier_body_translation = Vec3::new(
-                            rapier_pos.translation.x,
-                            rapier_pos.translation.y,
-                            rapier_pos.translation.z,
-                        );
-                        let bevy_rapier_body_rotation = Quat::from_array([
-                            rapier_body_rotation.i,
-                            rapier_body_rotation.j,
-                            rapier_body_rotation.k,
-                            rapier_body_rotation.w,
-                        ]);
-
-                        if let Some(visual_pose) = extracted_geometry.visual_poses.get(geom_index) {
-                            let pose_translation = Vec3::new(
-                                visual_pose.xyz.0[0] as f32,
-                                visual_pose.xyz.0[1] as f32,
-                                visual_pose.xyz.0[2] as f32,
+                            let mut rapier_body_translation = Vec3::new(
+                                link_transform.position[0],
+                                link_transform.position[1],
+                                link_transform.position[2],
                             );
+                            let bevy_rapier_body_rotation = Quat::from_array([
+                                rapier_body_rotation.i,
+                                rapier_body_rotation.j,
+                                rapier_body_rotation.k,
+                                rapier_body_rotation.w,
+                            ]);
 
-                            let pose_rotation = UnitQuaternion::from_euler_angles(
-                                visual_pose.rpy.0[0] as f32,
-                                visual_pose.rpy.0[1] as f32,
-                                visual_pose.rpy.0[2] as f32,
-                            );
+                            if let Some(visual_pose) =
+                                extracted_geometry.visual_poses.get(geom_index)
+                            {
+                                let pose_translation = Vec3::new(
+                                    visual_pose.xyz.0[0] as f32,
+                                    visual_pose.xyz.0[1] as f32,
+                                    visual_pose.xyz.0[2] as f32,
+                                );
 
-                            rapier_body_translation += bevy_rapier_body_rotation * pose_translation;
-                            rapier_body_rotation = rapier_body_rotation * pose_rotation;
+                                let pose_rotation = UnitQuaternion::from_euler_angles(
+                                    visual_pose.rpy.0[0] as f32,
+                                    visual_pose.rpy.0[1] as f32,
+                                    visual_pose.rpy.0[2] as f32,
+                                );
 
-                            let bevy_translation =
-                                rapier_to_bevy_rotation().mul_vec3(rapier_body_translation);
-                            let bevy_rotation = rapier_to_bevy_rotation()
-                                * Quat::from_array([
-                                    rapier_body_rotation.i,
-                                    rapier_body_rotation.j,
-                                    rapier_body_rotation.k,
-                                    rapier_body_rotation.w,
-                                ]);
+                                rapier_body_translation +=
+                                    bevy_rapier_body_rotation * pose_translation;
+                                rapier_body_rotation = rapier_body_rotation * pose_rotation;
 
-                            let mut ec = children.spawn((
-                                mesh_3d,
-                                MeshMaterial3d(materials.add(Color::srgb(0.2, 0.8, 0.2))),
-                                URDFRobotRigidBodyHandle {
-                                    rigid_body_handle: body_handles[index],
-                                    visual_pose: visual_pose.clone(),
-                                },
-                                RapierContextEntityLink(rapier_context_simulation_entity),
-                                Name::new(format!(
-                                    "{} part {} / {}",
-                                    extracted_geometry.link.name.clone(),
-                                    geom_index + 1,
-                                    extracted_geometry.geometries.len(),
-                                )),
-                            ));
+                                let bevy_translation =
+                                    rapier_to_bevy_rotation().mul_vec3(rapier_body_translation);
+                                let bevy_rotation = rapier_to_bevy_rotation()
+                                    * Quat::from_array([
+                                        rapier_body_rotation.i,
+                                        rapier_body_rotation.j,
+                                        rapier_body_rotation.k,
+                                        rapier_body_rotation.w,
+                                    ]);
 
-                            if let Some(drone_descriptor) = drone_descriptor.clone() {
-                                let adp = drone_descriptor.aerodynamic_props;
-                                let vbp = drone_descriptor.visual_body_properties;
-                                let dmp = drone_descriptor.dynamics_model_props;
+                                let mut ec = children.spawn((
+                                    mesh_3d,
+                                    MeshMaterial3d(materials.add(Color::srgb(0.2, 0.8, 0.2))),
+                                    URDFRobotRigidBodyHandle {
+                                        rigid_body_handle: body_handles[index],
+                                        visual_pose: visual_pose.clone(),
+                                    },
+                                    RapierContextEntityLink(rapier_context_simulation_entity),
+                                    Name::new(format!(
+                                        "{} part {} / {}",
+                                        extracted_geometry.link.name.clone(),
+                                        geom_index + 1,
+                                        extracted_geometry.geometries.len(),
+                                    )),
+                                ));
 
-                                if vbp.rotor_body_indices.contains(&index) {
-                                    let max_thrust = adp.thrust2weight * dmp.mass * 9.81;
+                                if let Some(drone_descriptor) = drone_descriptor.clone() {
+                                    let adp = drone_descriptor.aerodynamic_props;
+                                    let vbp = drone_descriptor.visual_body_properties;
+                                    let dmp = drone_descriptor.dynamics_model_props;
 
-                                    let rotor_state = RotorState::new(
-                                        max_thrust,
-                                        max_thrust * 2.0,
-                                        adp.kf,
-                                        adp.km,
-                                    );
+                                    if vbp.rotor_body_indices.contains(&index) {
+                                        let max_thrust = adp.thrust2weight * dmp.mass * 9.81;
 
-                                    let transform = if let Some(visual_rotor_position) =
-                                        vbp.rotor_positions.get(rotor_index)
-                                    {
-                                        Transform::from_translation(*visual_rotor_position)
-                                            .with_rotation(bevy_rotation)
-                                    } else {
-                                        Transform::from_translation(bevy_translation)
-                                            .with_rotation(bevy_rotation)
-                                    };
+                                        let rotor_state = RotorState::new(
+                                            max_thrust,
+                                            max_thrust * 2.0,
+                                            adp.kf,
+                                            adp.km,
+                                        );
 
-                                    ec.insert(DroneRotor {
-                                        state: rotor_state,
-                                        transform: transform,
-                                        rotor_index,
-                                    });
-                                    rotor_index += 1;
+                                        let transform = if let Some(visual_rotor_position) =
+                                            vbp.rotor_positions.get(rotor_index)
+                                        {
+                                            Transform::from_translation(*visual_rotor_position)
+                                                .with_rotation(bevy_rotation)
+                                        } else {
+                                            Transform::from_translation(bevy_translation)
+                                                .with_rotation(bevy_rotation)
+                                        };
 
+                                        ec.insert(DroneRotor {
+                                            state: rotor_state,
+                                            transform: transform,
+                                            rotor_index,
+                                        });
+                                        rotor_index += 1;
+
+                                        ec.insert(transform);
+                                    }
+                                } else {
+                                    let transform = Transform::from_translation(bevy_translation)
+                                        .with_rotation(bevy_rotation);
                                     ec.insert(transform);
                                 }
-                            } else {
-                                let transform = Transform::from_translation(bevy_translation)
-                                    .with_rotation(bevy_rotation);
-                                ec.insert(transform);
-                            }
 
-                            // insert entity id to collider data, otherwise it breaks in debug mode
-                            let entity_id = ec.id().index();
-                            for (_entity, mut rigid_body_set, mut collider_set, _) in
-                                q_rapier_context.iter_mut()
-                            {
-                                if let Some(rigid_body) =
-                                    rigid_body_set.bodies.get_mut(body_handles[index])
+                                // insert entity id to collider data, otherwise it breaks in debug mode
+                                let entity_id = ec.id().index();
+                                for (_entity, mut rigid_body_set, mut collider_set, _) in
+                                    q_rapier_context.iter_mut()
                                 {
-                                    let collider_handles = rigid_body.colliders();
-                                    for collider_handle in collider_handles.iter() {
-                                        let collider = collider_set
-                                            .colliders
-                                            .get_mut(*collider_handle)
-                                            .unwrap();
-                                        collider.user_data = entity_id as u128;
+                                    if let Some(rigid_body) =
+                                        rigid_body_set.bodies.get_mut(body_handles[index])
+                                    {
+                                        let collider_handles = rigid_body.colliders();
+                                        for collider_handle in collider_handles.iter() {
+                                            let collider = collider_set
+                                                .colliders
+                                                .get_mut(*collider_handle)
+                                                .unwrap();
+                                            collider.user_data = entity_id as u128;
+                                        }
                                     }
                                 }
                             }

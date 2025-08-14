@@ -500,25 +500,15 @@ fn multirotor_dynamics(
     )
 }
 
-pub(crate) fn render_drone_rotors(
-    mut q_rotors: Query<(Entity, &ChildOf, &mut Transform, &DroneRotor)>,
-    q_bodies: Query<(Entity, &ChildOf, &Transform), Without<DroneRotor>>,
-) {
+pub(crate) fn render_drone_rotors(mut q_rotors: Query<(Entity, &mut Transform, &DroneRotor)>) {
     let quat_fix = Quat::from_rotation_x(std::f32::consts::PI / 2.0);
-    for (_, child_of, mut transform, rotor) in q_rotors.iter_mut() {
-        let parent_entity = child_of.parent();
-        if let Some((_, _, root_transform)) = q_bodies
-            .iter()
-            .find(|(_, child_of, _)| child_of.parent() == parent_entity)
-        {
-            let rotor_direction = if rotor.rotor_index % 2 == 0 {
-                -1.0
-            } else {
-                1.0
-            };
-            transform.translation += root_transform.rotation * rotor.transform.translation;
-            transform.rotation =
-                quat_fix * Quat::from_rotation_z(rotor_direction * rotor.state.current_angle);
-        }
+    for (_, mut transform, rotor) in q_rotors.iter_mut() {
+        let rotor_direction = if rotor.rotor_index % 2 == 0 {
+            -1.0
+        } else {
+            1.0
+        };
+        transform.rotation =
+            quat_fix * Quat::from_rotation_z(rotor_direction * rotor.state.current_angle);
     }
 }

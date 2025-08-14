@@ -213,7 +213,8 @@ fn sync_robot_geometry(
     mut q_rapier_robot_bodies: Query<(Entity, &mut Transform, &mut URDFRobotRigidBodyHandle)>,
     q_rapier_rigid_body_set: Query<(&RapierRigidBodySet,)>,
 ) {
-    // return;
+    return;
+
     for rapier_rigid_body_set in q_rapier_rigid_body_set.iter() {
         for (_, mut transform, body_handle) in q_rapier_robot_bodies.iter_mut() {
             if let Some(robot_body) = rapier_rigid_body_set
@@ -221,49 +222,53 @@ fn sync_robot_geometry(
                 .bodies
                 .get(body_handle.rigid_body_handle)
             {
-                let body_translation = robot_body.position().translation.vector;
-                let mut body_translation =
-                    Vec3::new(body_translation.x, body_translation.y, body_translation.z);
-                let mut body_rotation = robot_body.position().rotation;
                 let visual_pose = body_handle.visual_pose.clone();
 
-                let pose_translation = Vec3::new(
+                // Get body transform from Rapier
+                let nalgebra_body_translation = robot_body.position().translation.vector;
+                let mut bevy_body_translation = Vec3::new(
+                    nalgebra_body_translation.x,
+                    nalgebra_body_translation.y,
+                    nalgebra_body_translation.z,
+                );
+                let nalgebra_body_rotation = robot_body.position().rotation;
+
+                // Convert body rotation to Bevy quaternion (correct component order)
+                let bevy_body_rotation = Quat::from_xyzw(
+                    nalgebra_body_rotation.i,
+                    nalgebra_body_rotation.j,
+                    nalgebra_body_rotation.k,
+                    nalgebra_body_rotation.w,
+                );
+
+                // Get visual pose offset
+                let bevy_pose_translation = Vec3::new(
                     visual_pose.xyz.0[0] as f32,
                     visual_pose.xyz.0[1] as f32,
                     visual_pose.xyz.0[2] as f32,
                 );
-
-                let pose_rotation_rapier = UnitQuaternion::from_euler_angles(
+                let nalgebra_pose_rotation = UnitQuaternion::from_euler_angles(
                     visual_pose.rpy.0[0] as f32,
                     visual_pose.rpy.0[1] as f32,
                     visual_pose.rpy.0[2] as f32,
                 );
+                let bevy_pose_rotation = Quat::from_xyzw(
+                    nalgebra_pose_rotation.i,
+                    nalgebra_pose_rotation.j,
+                    nalgebra_pose_rotation.k,
+                    nalgebra_pose_rotation.w,
+                );
 
-                let bevy_rotation = rapier_to_bevy_rotation()
-                    * Quat::from_array([
-                        body_rotation.i,
-                        body_rotation.j,
-                        body_rotation.k,
-                        body_rotation.w,
-                    ]);
+                // Apply pose offset to body transform
+                bevy_body_translation += bevy_body_rotation * bevy_pose_translation;
+                let final_rotation = bevy_body_rotation * bevy_pose_rotation;
 
-                body_translation += bevy_rotation * pose_translation;
-                body_rotation = body_rotation * pose_rotation_rapier;
+                // Convert to Bevy coordinate system
+                let bevy_translation = rapier_to_bevy_rotation().mul_vec3(bevy_body_translation);
+                let bevy_rotation = rapier_to_bevy_rotation() * final_rotation;
 
-                let bevy_rotation = rapier_to_bevy_rotation()
-                    * Quat::from_array([
-                        body_rotation.i,
-                        body_rotation.j,
-                        body_rotation.k,
-                        body_rotation.w,
-                    ]);
-
-                let rapier_translation =
-                    Vec3::new(body_translation.x, body_translation.y, body_translation.z);
-
-                let bevy_translation = rapier_to_bevy_rotation().mul_vec3(rapier_translation);
                 *transform =
-                    Transform::from_translation(bevy_translation).with_rotation(-bevy_rotation);
+                    Transform::from_translation(bevy_translation).with_rotation(bevy_rotation);
             }
         }
     }
