@@ -1,8 +1,8 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use nalgebra::{Quaternion, UnitQuaternion};
+use nalgebra::{Isometry, Quaternion, UnitQuaternion};
 use rapier3d::prelude::{InteractionGroups, MultibodyJointHandle, RigidBodyHandle, RigidBodySet};
 use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobotHandles};
 use uav::dynamics::RotorState;
@@ -12,7 +12,7 @@ use crate::{
         try_extract_drone_aerodynamics_properties,
         try_extract_drone_visual_and_dynamics_model_properties, DroneDescriptor, DroneRotor,
     },
-    kinematics::get_link_transforms,
+    kinematics::{get_link_transforms, LinkTransform},
     plugin::{extract_robot_geometry, URDFRobot, URDFRobotRigidBodyHandle},
     rapier_to_bevy_rotation,
     urdf_asset_loader::{RpyAssetLoaderSettings, UrdfAsset},
@@ -98,6 +98,22 @@ pub struct ControlMotors {
     pub velocities: Vec<f32>,
 }
 
+pub fn apply_transforms_to_rapier(
+    transforms: &HashMap<String, LinkTransform>,
+    link_to_body_map: &HashMap<String, RigidBodyHandle>,
+    rigid_body_set: &mut RigidBodySet,
+) {
+    for (link_name, transform) in transforms {
+        if let Some(body_handle) = link_to_body_map.get(link_name) {
+            if let Some(rigid_body) = rigid_body_set.get_mut(*body_handle) {
+                let position = Isometry::from_parts(transform.position.into(), transform.rotation);
+                rigid_body.set_position(position, true);
+                println!("~~~");
+            }
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn handle_spawn_robot(
     mut commands: Commands,
@@ -169,8 +185,10 @@ pub(crate) fn handle_spawn_robot(
             }
 
             let rapier_handles = maybe_rapier_handles.unwrap();
+
             let body_handles: Vec<RigidBodyHandle> =
                 rapier_handles.links.iter().map(|link| link.body).collect();
+
             let extracted_geometries = extract_robot_geometry(urdf_asset);
 
             assert_eq!(body_handles.len(), extracted_geometries.len());
@@ -474,8 +492,7 @@ pub(crate) fn handle_control_motors(
             let mut actuator_index: usize = 0;
 
             for joint_link_handle in urdf_robot.rapier_handles.joints.iter() {
-                for (mut rapier_context_joints, _rapier_rigid_bodies) in q_rapier_joints.iter_mut()
-                {
+                for (mut rapier_context_joints, rapier_rigid_bodies) in q_rapier_joints.iter_mut() {
                     if let Some(handle) = joint_link_handle.joint {
                         if let Some((multibody, index)) =
                             rapier_context_joints.multibody_joints.get_mut(handle)
@@ -499,6 +516,35 @@ pub(crate) fn handle_control_motors(
                                             target_velocity,
                                             1.0,
                                         );
+
+                                        let joint = link.joint.data;
+
+                                        let body_1_link = joint_link_handle.link1;
+                                        let body_2_link = joint_link_handle.link2;
+
+                                        if let Some(revolute) = joint.as_revolute() {
+                                            let rb1 = rapier_rigid_bodies.bodies.get(body_1_link);
+                                            let rb2 = rapier_rigid_bodies.bodies.get(body_2_link);
+
+                                            if rb1.is_none() || rb2.is_none() {
+                                                continue;
+                                            }
+
+                                            let rb1 = rb1.unwrap();
+                                            let rb2 = rb2.unwrap();
+
+                                            let angle =
+                                                revolute.angle(rb1.rotation(), rb2.rotation());
+
+                                            println!(
+                                                "limit: {:?}",
+                                                link.joint.data.limits(JointAxis::AngX)
+                                            );
+
+                                            println!("value: {:?}", angle);
+
+                                            println!("~~~");
+                                        }
 
                                         actuator_index += 1;
                                     }

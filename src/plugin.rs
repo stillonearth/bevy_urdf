@@ -97,7 +97,8 @@ impl Plugin for UrdfPlugin {
             .add_event::<UAVStateUpdate>()
             .add_event::<SpawnRobot>()
             .add_event::<WaitRobotLoaded>()
-            .init_asset::<urdf_asset_loader::UrdfAsset>();
+            .init_asset::<urdf_asset_loader::UrdfAsset>()
+            .init_resource::<SyncGeometryCounter>();
 
         if self.default_system_setup {
             app.add_systems(
@@ -166,6 +167,11 @@ pub struct URDFRobotRigidBodyHandle {
     pub visual_pose: Pose,
 }
 
+#[derive(Resource, Default)]
+pub struct SyncGeometryCounter {
+    pub count: usize,
+}
+
 // Plugin
 
 pub struct ExtractedGeometry {
@@ -212,8 +218,9 @@ pub fn extract_robot_geometry(robot: &UrdfAsset) -> Vec<ExtractedGeometry> {
 fn sync_robot_geometry(
     mut q_rapier_robot_bodies: Query<(Entity, &mut Transform, &mut URDFRobotRigidBodyHandle)>,
     q_rapier_rigid_body_set: Query<(&RapierRigidBodySet,)>,
+    mut counter: ResMut<SyncGeometryCounter>,
 ) {
-    return;
+    // return;
 
     for rapier_rigid_body_set in q_rapier_rigid_body_set.iter() {
         for (_, mut transform, body_handle) in q_rapier_robot_bodies.iter_mut() {
@@ -222,6 +229,11 @@ fn sync_robot_geometry(
                 .bodies
                 .get(body_handle.rigid_body_handle)
             {
+                // Only run for exactly 10 iterations
+                if counter.count >= 20 {
+                    return;
+                }
+                counter.count += 1;
                 let visual_pose = body_handle.visual_pose.clone();
 
                 // Get body transform from Rapier

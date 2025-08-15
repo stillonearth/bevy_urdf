@@ -14,6 +14,8 @@ use bevy_urdf::events::{ControlMotors, LoadRobot, RobotLoaded};
 use bevy_urdf::events::{RapierOption, SpawnRobot};
 use bevy_urdf::plugin::RobotType;
 use bevy_urdf::plugin::UrdfPlugin;
+use rapier3d::prelude::Group;
+use rapier3d::prelude::InteractionGroups;
 
 #[derive(Resource)]
 struct UrdfRobotHandle(Option<Handle<UrdfAsset>>);
@@ -77,14 +79,14 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
     });
 
     // ground
-    // commands.spawn((
-    //     InfiniteGridBundle {
-    //         transform: Transform::from_xyz(0.0, -0.25, 0.0),
-    //         ..default()
-    //     },
-    //     RigidBody::Fixed,
-    //     Collider::cuboid(900., 0.05, 900.),
-    // ));
+    commands.spawn((
+        InfiniteGridBundle {
+            transform: Transform::from_xyz(0.0, -1.0, 0.0),
+            ..default()
+        },
+        RigidBody::Fixed,
+        Collider::cuboid(900., 0.05, 900.),
+    ));
 
     // camera
     commands.spawn((
@@ -102,9 +104,9 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
         urdf_path: "manipulators/so-101/so101_new_calib.urdf".to_string(),
         mesh_dir: "assets/manipulators/so-101/".to_string(),
         rapier_options: RapierOption {
-            interaction_groups: None,
+            interaction_groups: Some(InteractionGroups::new(Group::GROUP_4, Group::ALL).into()),
             translation_shift: None,
-            create_colliders_from_visual_shapes: true,
+            create_colliders_from_visual_shapes: false,
             create_colliders_from_collision_shapes: true,
             make_roots_fixed: true,
         },
@@ -117,7 +119,6 @@ fn control_motors(
     robot_handle: Res<UrdfRobotHandle>,
     mut ew_control_motors: EventWriter<ControlMotors>,
 ) {
-    return;
     if let Some(handle) = robot_handle.0.clone() {
         let mut rng = rand::rng();
         let mut velocities: Vec<f32> = Vec::new();

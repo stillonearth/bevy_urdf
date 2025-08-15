@@ -8,13 +8,12 @@ pub struct LinkTransform {
 
 use nalgebra::{Point3, Quaternion, UnitQuaternion, Vector3};
 
-// For Vector3 reinitialization
+// reinit_vector3 and reinit_quaternion reinitialize nalgebra types because k and urdf use different versions of nalgebra
 pub fn reinit_vector3<T: Copy>(old_vec: &impl AsRef<[T; 3]>) -> Vector3<T> {
     let components = old_vec.as_ref();
     Vector3::new(components[0], components[1], components[2])
 }
 
-// For UnitQuaternion reinitialization
 pub fn reinit_quaternion<T: Copy + nalgebra::RealField>(
     w: T,
     x: T,
@@ -27,12 +26,12 @@ pub fn reinit_quaternion<T: Copy + nalgebra::RealField>(
 }
 
 pub fn get_link_transforms(
-    urdf_robot: &urdf_rs::Robot,
+    robot: &urdf_rs::Robot,
     isometry: nalgebra::Isometry<f32, nalgebra::Unit<nalgebra::Quaternion<f32>>, 3>,
 ) -> Result<HashMap<String, LinkTransform>, k::Error> {
     // Convert URDF to kinematic chain
 
-    let robot: k::Chain<f32> = urdf_robot.clone().into();
+    let robot: k::Chain<f32> = robot.clone().into();
 
     // Compute forward kinematics
     robot.update_transforms();
@@ -44,14 +43,10 @@ pub fn get_link_transforms(
         let world_transform = link.world_transform().unwrap();
         let link_name = &link.link().clone().unwrap().name;
 
-        println!("isometry: {:?}", isometry);
-
         // Extract position
         let position = reinit_vector3(&world_transform.translation.vector);
         let position = Point3::from(position);
         let position = isometry.transform_point(&position).coords;
-
-        println!("position: {:?}", position);
 
         let rotation = reinit_quaternion(
             world_transform.rotation.w,
@@ -63,6 +58,8 @@ pub fn get_link_transforms(
 
         transforms.insert(link_name.clone(), LinkTransform { position, rotation });
     }
+
+    // robot.
 
     Ok(transforms)
 }
