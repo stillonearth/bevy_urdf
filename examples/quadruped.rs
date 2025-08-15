@@ -8,7 +8,7 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
 
-use bevy_urdf::events::{ControlMotors, SensorsRead};
+use bevy_urdf::control::{ControlMotors, SensorsRead};
 use bevy_urdf::plugin::RobotType;
 use bevy_urdf::plugin::UrdfPlugin;
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
@@ -80,7 +80,7 @@ fn start_simulation(
             handle: event.handle.clone(),
             mesh_dir: event.mesh_dir.clone(),
             parent_entity: None,
-            robot_type: RobotType::NotDrone,
+            robot_type: RobotType::Other,
             drone_descriptor: None,
         });
         state.set(AppState::Simulation);
@@ -203,7 +203,7 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
 
     // load robot
     ew_load_robot.send(LoadRobot {
-        robot_type: RobotType::NotDrone,
+        robot_type: RobotType::Other,
         urdf_path: "robots/unitree_a1/urdf/a1.urdf".to_string(),
         mesh_dir: "assets/robots/unitree_a1/urdf/".to_string(),
         rapier_options: RapierOption {

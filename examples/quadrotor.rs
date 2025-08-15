@@ -102,7 +102,7 @@ fn start_simulation(
             handle: event.handle.clone(),
             mesh_dir: event.mesh_dir.clone(),
             parent_entity: Some(q_crazflie.iter().last().unwrap().0),
-            robot_type: RobotType::Drone,
+            robot_type: RobotType::UAV,
             drone_descriptor: event.drone_descriptor.clone(),
         });
         state.set(AppState::Simulation);
@@ -195,7 +195,7 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
 
     // load robot
     ew_load_robot.send(LoadRobot {
-        robot_type: RobotType::NotDrone,
+        robot_type: RobotType::Other,
         urdf_path: "quadrotors/crazyflie/cf2x.urdf".to_string(),
         mesh_dir: "assets/quadrotors/crazyflie/".to_string(),
         marker: None,

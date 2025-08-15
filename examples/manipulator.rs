@@ -10,7 +10,7 @@ use bevy_stl::StlPlugin;
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
 use rand::Rng;
 
-use bevy_urdf::events::ControlMotors;
+use bevy_urdf::control::ControlMotors;
 use bevy_urdf::plugin::RobotType;
 use bevy_urdf::plugin::UrdfPlugin;
 use bevy_urdf::spawn::{LoadRobot, RapierOption, RobotLoaded, SpawnRobot};
@@ -54,7 +54,7 @@ fn start_simulation(
             handle: event.handle.clone(),
             mesh_dir: event.mesh_dir.clone(),
             parent_entity: None,
-            robot_type: RobotType::NotDrone,
+            robot_type: RobotType::Manipulator,
             drone_descriptor: None,
         });
         state.set(AppState::Simulation);
@@ -100,7 +100,7 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
 
     // load robot
     ew_load_robot.send(LoadRobot {
-        robot_type: RobotType::NotDrone,
+        robot_type: RobotType::Manipulator,
         urdf_path: "manipulators/so-101/so101_new_calib.urdf".to_string(),
         mesh_dir: "assets/manipulators/so-101/".to_string(),
         rapier_options: RapierOption {
@@ -119,6 +119,7 @@ fn control_motors(
     robot_handle: Res<UrdfRobotHandle>,
     mut ew_control_motors: EventWriter<ControlMotors>,
 ) {
+    return;
     if let Some(handle) = robot_handle.0.clone() {
         let mut rng = rand::rng();
         let mut velocities: Vec<f32> = Vec::new();

@@ -1,5 +1,5 @@
+pub mod control;
 pub mod drones;
-pub mod events;
 pub mod kinematics;
 pub mod plugin;
 pub mod spawn;

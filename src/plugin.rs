@@ -23,11 +23,11 @@ pub fn rapier_to_bevy_rotation() -> Quat {
 }
 
 use crate::{
+    control::{handle_control_motors, ControlMotors, SensorsRead, UAVStateUpdate},
     drones::{
         handle_control_thrusts, render_drone_rotors, simulate_drone, switch_drone_physics,
         ControlThrusts,
     },
-    events::{handle_control_motors, ControlMotors, SensorsRead, UAVStateUpdate},
     spawn::{
         handle_despawn_robot, handle_load_robot, handle_spawn_robot, handle_wait_robot_loaded,
         DespawnRobot, LoadRobot, RobotLoaded, RobotSpawned, SpawnRobot, WaitRobotLoaded,
@@ -131,8 +131,9 @@ pub struct URDFRobot {
 
 #[derive(Clone, PartialEq, PartialOrd, Copy, Debug, Reflect)]
 pub enum RobotType {
-    Drone,
-    NotDrone,
+    UAV,
+    Other,
+    Manipulator,
 }
 
 impl FromStr for RobotType {
@@ -140,8 +141,9 @@ impl FromStr for RobotType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "drone" => Ok(RobotType::Drone),
-            "notdrone" | "not_drone" | "not-drone" => Ok(RobotType::NotDrone),
+            "drone" | "uav" => Ok(RobotType::UAV),
+            "notdrone" | "not_drone" | "not-drone" | "other" => Ok(RobotType::Other),
+            "manipulator" => Ok(RobotType::Manipulator),
             _ => Err(format!("Invalid robot type: '{s}'")),
         }
     }

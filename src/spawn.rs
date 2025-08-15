@@ -9,8 +9,8 @@ use uav::dynamics::RotorState;
 
 use crate::{
     drones::{
-        try_extract_drone_aerodynamics_properties,
-        try_extract_drone_visual_and_dynamics_model_properties, DroneDescriptor, DroneRotor,
+        try_extract_drone_aerodynamic_props, try_extract_drone_visual_and_dynamic_model_props,
+        DroneDescriptor, DroneRotor,
     },
     kinematics::{get_link_transforms, LinkTransform},
     plugin::{
@@ -102,10 +102,10 @@ fn try_create_drone_descriptor(
     drone_descriptor: Option<DroneDescriptor>,
     urdf_asset: &UrdfAsset,
 ) -> Option<DroneDescriptor> {
-    if robot_type == RobotType::Drone && drone_descriptor.is_none() {
-        let adp = try_extract_drone_aerodynamics_properties(&urdf_asset.xml_string).unwrap();
+    if robot_type == RobotType::UAV && drone_descriptor.is_none() {
+        let adp = try_extract_drone_aerodynamic_props(&urdf_asset.xml_string).unwrap();
         let (dmp, vbp) =
-            try_extract_drone_visual_and_dynamics_model_properties(&urdf_asset.xml_string).unwrap();
+            try_extract_drone_visual_and_dynamic_model_props(&urdf_asset.xml_string).unwrap();
 
         Some(DroneDescriptor {
             aerodynamic_props: adp,
@@ -386,7 +386,7 @@ pub(crate) fn handle_spawn_robot(
                 commands.spawn(())
             };
 
-            if event.robot_type == RobotType::Drone {
+            if event.robot_type == RobotType::UAV {
                 ec.insert(drone_descriptor.clone().unwrap());
             }
 
