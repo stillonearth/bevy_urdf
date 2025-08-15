@@ -9,7 +9,7 @@ repository = "https://github.com/stillonearth/bevy_urdf"
 
 [dependencies]
 anyhow = "1.0"
-bevy = { version = "0.16", default-features = false, features = ["bevy_asset"] }
+bevy = { version = "0.16", default-features = false, features = ["bevy_asset", "png"] }
 rapier3d-urdf = { version = "0.6.0", features = ["stl", "wavefront"] }
 rapier3d = { version = "0.25", features = ["serde-serialize"] }
 bevy_rapier3d = { version = "0.30", features = [
@@ -30,6 +30,9 @@ uav = { version = "0.1.2" }
 roxmltree = "0.20"
 queues = "1.0.2"
 
+[patch.crates-io]
+fast_ode = { path = "patches/fast_ode-1.0.0" }
+
 [dev-dependencies]
 bevy = { version = "0.16", default-features = false, features = [
     "bevy_asset",
@@ -40,6 +43,7 @@ bevy = { version = "0.16", default-features = false, features = [
     "bevy_window",
     "tonemapping_luts",
     "x11",
+    "png",
 ] }
 bevy_flycam = { git = "https://github.com/kSDOT/bevy_flycam.git", rev = "a6f36a" }
 bevy-inspector-egui = "0.31"

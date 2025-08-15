@@ -23,10 +23,12 @@ use crate::{
     },
     events::{
         handle_control_motors, handle_despawn_robot, handle_load_robot, handle_spawn_robot,
-        handle_wait_robot_loaded, ControlMotors, DespawnRobot, LoadRobot, RobotLoaded,
-        RobotSpawned, SensorsRead, SpawnRobot, UAVStateUpdate, WaitRobotLoaded,
+        handle_wait_robot_loaded, ControlFins, ControlMotors, ControlThrusters, DespawnRobot,
+        LoadRobot, RobotLoaded, RobotSpawned, SensorsRead, SpawnRobot, UAVStateUpdate,
+        UuvStateUpdate, WaitRobotLoaded,
     },
     urdf_asset_loader::{self, UrdfAsset},
+    uuv::{handle_control_fins, handle_control_thrusters, simulate_uuv},
 };
 pub struct UrdfPlugin<PhysicsHooks = ()> {
     default_system_setup: bool,
@@ -48,12 +50,15 @@ where
     /// [`with_default_system_setup(false)`](Self::with_default_system_setup).
     pub fn get_systems(set: PhysicsSet) -> ScheduleConfigs<ScheduleSystem> {
         match set {
-            PhysicsSet::StepSimulation => ((switch_drone_physics, simulate_drone).chain())
+            PhysicsSet::StepSimulation => (switch_drone_physics, simulate_drone, simulate_uuv)
+                .chain()
                 .in_set(PhysicsSet::StepSimulation)
                 .into_configs(),
             PhysicsSet::SyncBackend => (
                 handle_control_motors,
                 handle_control_thrusts,
+                handle_control_thrusters,
+                handle_control_fins,
                 handle_despawn_robot,
                 handle_load_robot,
                 handle_spawn_robot,
@@ -88,12 +93,15 @@ impl Plugin for UrdfPlugin {
         app.init_asset_loader::<urdf_asset_loader::RpyAssetLoader>()
             .add_event::<ControlMotors>()
             .add_event::<ControlThrusts>()
+            .add_event::<ControlThrusters>()
+            .add_event::<ControlFins>()
             .add_event::<DespawnRobot>()
             .add_event::<LoadRobot>()
             .add_event::<RobotLoaded>()
             .add_event::<RobotSpawned>()
             .add_event::<SensorsRead>()
             .add_event::<UAVStateUpdate>()
+            .add_event::<UuvStateUpdate>()
             .add_event::<SpawnRobot>()
             .add_event::<WaitRobotLoaded>()
             .init_asset::<urdf_asset_loader::UrdfAsset>();
@@ -127,6 +135,7 @@ pub struct URDFRobot {
 pub enum RobotType {
     Drone,
     NotDrone,
+    Uuv,
 }
 
 impl FromStr for RobotType {
@@ -136,6 +145,7 @@ impl FromStr for RobotType {
         match s.to_lowercase().as_str() {
             "drone" => Ok(RobotType::Drone),
             "notdrone" | "not_drone" | "not-drone" => Ok(RobotType::NotDrone),
+            "uuv" => Ok(RobotType::Uuv),
             _ => Err(format!("Invalid robot type: '{s}'")),
         }
     }

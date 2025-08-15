@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<robot name="simple_uuv">
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="1.0"/>
+      <inertia ixx="0.1" ixy="0" ixz="0" iyy="0.1" iyz="0" izz="0.1"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.2 0.2 0.2"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.2 0.2 0.2"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="thruster_front">
+    <inertial>
+      <origin xyz="0.2 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+    </inertial>
+  </link>
+  <joint name="thruster_front_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="thruster_front"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="thruster_back">
+    <inertial>
+      <origin xyz="-0.2 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+    </inertial>
+  </link>
+  <joint name="thruster_back_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="thruster_back"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+</robot>

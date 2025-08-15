@@ -31,7 +31,7 @@ Add the necessary plugins to your Bevy app:
 
 ```rust
 use bevy::prelude::*;
-use bevy_urdf::{UrdfPlugin, StlPlugin, ObjPlugin};
+use bevy_urdf::{UrdfPlugin, StlPlugin, ObjPlugin, CameraControlPlugin};
 
 fn main() {
     App::new()
@@ -40,6 +40,7 @@ fn main() {
             UrdfPlugin,
             StlPlugin,
             ObjPlugin,
+            CameraControlPlugin,
         ))
         .run();
 }
@@ -124,10 +125,35 @@ pub struct ControlThrusts {
 }
 ```
 
+#### Thruster Control (UUVs)
+
+For underwater vehicles:
+
+```rust
+#[derive(Event)]
+pub struct ControlThrusters {
+    pub handle: Handle<UrdfAsset>,
+    pub thrusts: Vec<f32>,
+}
+```
+
+#### Camera Rotation
+
+Control the viewing angle of any active camera:
+
+```rust
+#[derive(Event)]
+pub struct RotateCamera {
+    pub delta_yaw: f32,
+    pub delta_pitch: f32,
+}
+```
+
 ### Robot Types
 
 - `RobotType::NotDrone` - Ground vehicles, quadrupeds, manipulators
 - `RobotType::Drone` - Aerial vehicles with thrust-based control
+- `RobotType::Uuv` - Underwater vehicles with thruster control
 
 ## Examples
 
@@ -137,10 +163,12 @@ Run the included examples to see the plugin in action:
 # Drone simulation
 cargo run --example quadrotor --release
 
-# Quadruped robot simulation  
+# Quadruped robot simulation
 cargo run --example quadruped --release
-```
 
+# Underwater vehicle simulation
+cargo run --example uuv --release
+```
 ## URDF Requirements
 
 Before using URDF files with this plugin:
