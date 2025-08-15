@@ -1,3 +1,4 @@
+use bevy::input::keyboard::KeyCode;
 use bevy::{
     color::palettes::css::WHITE, input::common_conditions::input_toggle_active, prelude::*,
 };
@@ -14,8 +15,7 @@ use nalgebra::{UnitQuaternion, Vector3};
 use bevy_urdf::drones::{ControlThrusts, DroneDescriptor};
 use bevy_urdf::plugin::UrdfPlugin;
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
-use bevy_urdf::{LoadRobot, RobotLoaded};
-use bevy_urdf::{RapierOption, SpawnRobot};
+use bevy_urdf::{LoadRobot, RapierOption, RobotLoaded, SpawnRobot};
 
 fn main() {
     let mut controller = uav::control::QuadcopterController::new(
@@ -203,7 +203,7 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
             create_colliders_from_collision_shapes: true,
             create_colliders_from_visual_shapes: false,
             interaction_groups: None,
-            translation_shift: None, //Some(Vec3::new(0.0, 1.0, 0.0)),
+            translation_shift: None,
             make_roots_fixed: false,
         },
         drone_descriptor: None,

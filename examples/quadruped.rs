@@ -8,11 +8,11 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
 
-use bevy_urdf::events::{ControlMotors, DespawnRobot, LoadRobot, RobotLoaded, SensorsRead};
-use bevy_urdf::events::{RapierOption, SpawnRobot};
+use bevy_urdf::events::{ControlMotors, SensorsRead};
 use bevy_urdf::plugin::RobotType;
 use bevy_urdf::plugin::UrdfPlugin;
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
+use bevy_urdf::{DespawnRobot, LoadRobot, RapierOption, RobotLoaded, SpawnRobot};
 
 use rand::Rng;
 

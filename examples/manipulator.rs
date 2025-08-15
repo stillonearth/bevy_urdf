@@ -10,10 +10,10 @@ use bevy_stl::StlPlugin;
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
 use rand::Rng;
 
-use bevy_urdf::events::{ControlMotors, LoadRobot, RobotLoaded};
-use bevy_urdf::events::{RapierOption, SpawnRobot};
+use bevy_urdf::events::ControlMotors;
 use bevy_urdf::plugin::RobotType;
 use bevy_urdf::plugin::UrdfPlugin;
+use bevy_urdf::spawn::{LoadRobot, RapierOption, RobotLoaded, SpawnRobot};
 use rapier3d::prelude::Group;
 use rapier3d::prelude::InteractionGroups;
 

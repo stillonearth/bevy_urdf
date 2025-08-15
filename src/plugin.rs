@@ -17,15 +17,20 @@ use rapier3d::prelude::{Collider, MultibodyJointHandle, RigidBodyHandle};
 use rapier3d_urdf::UrdfRobotHandles;
 use urdf_rs::{Geometry, Link, Pose};
 
+/// Coordinate system conversion from Rapier to Bevy
+pub fn rapier_to_bevy_rotation() -> Quat {
+    Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)
+}
+
 use crate::{
     drones::{
         handle_control_thrusts, render_drone_rotors, simulate_drone, switch_drone_physics,
         ControlThrusts,
     },
-    events::{
-        handle_control_motors, handle_despawn_robot, handle_load_robot, handle_spawn_robot,
-        handle_wait_robot_loaded, ControlMotors, DespawnRobot, LoadRobot, RobotLoaded,
-        RobotSpawned, SensorsRead, SpawnRobot, UAVStateUpdate, WaitRobotLoaded,
+    events::{handle_control_motors, ControlMotors, SensorsRead, UAVStateUpdate},
+    spawn::{
+        handle_despawn_robot, handle_load_robot, handle_spawn_robot, handle_wait_robot_loaded,
+        DespawnRobot, LoadRobot, RobotLoaded, RobotSpawned, SpawnRobot, WaitRobotLoaded,
     },
     urdf_asset_loader::{self, UrdfAsset},
 };
@@ -97,8 +102,7 @@ impl Plugin for UrdfPlugin {
             .add_event::<UAVStateUpdate>()
             .add_event::<SpawnRobot>()
             .add_event::<WaitRobotLoaded>()
-            .init_asset::<urdf_asset_loader::UrdfAsset>()
-            .init_resource::<SyncGeometryCounter>();
+            .init_asset::<urdf_asset_loader::UrdfAsset>();
 
         if self.default_system_setup {
             app.add_systems(
@@ -114,10 +118,6 @@ impl Plugin for UrdfPlugin {
             );
         }
     }
-}
-
-pub(crate) fn rapier_to_bevy_rotation() -> Quat {
-    Quat::IDENTITY
 }
 
 // Components
@@ -167,11 +167,6 @@ pub struct URDFRobotRigidBodyHandle {
     pub visual_pose: Pose,
 }
 
-#[derive(Resource, Default)]
-pub struct SyncGeometryCounter {
-    pub count: usize,
-}
-
 // Plugin
 
 pub struct ExtractedGeometry {
@@ -215,13 +210,62 @@ pub fn extract_robot_geometry(robot: &UrdfAsset) -> Vec<ExtractedGeometry> {
         .collect()
 }
 
+fn extract_body_transform_from_rapier(robot_body: &rapier3d::dynamics::RigidBody) -> (Vec3, Quat) {
+    let nalgebra_body_translation = robot_body.position().translation.vector;
+    let bevy_body_translation = Vec3::new(
+        nalgebra_body_translation.x,
+        nalgebra_body_translation.y,
+        nalgebra_body_translation.z,
+    );
+
+    let nalgebra_body_rotation = robot_body.position().rotation;
+    let bevy_body_rotation = Quat::from_xyzw(
+        nalgebra_body_rotation.i,
+        nalgebra_body_rotation.j,
+        nalgebra_body_rotation.k,
+        nalgebra_body_rotation.w,
+    );
+
+    (bevy_body_translation, bevy_body_rotation)
+}
+
+fn extract_visual_pose_offset(visual_pose: &urdf_rs::Pose) -> (Vec3, Quat) {
+    let bevy_pose_translation = Vec3::new(
+        visual_pose.xyz.0[0] as f32,
+        visual_pose.xyz.0[1] as f32,
+        visual_pose.xyz.0[2] as f32,
+    );
+
+    let nalgebra_pose_rotation = UnitQuaternion::from_euler_angles(
+        visual_pose.rpy.0[0] as f32,
+        visual_pose.rpy.0[1] as f32,
+        visual_pose.rpy.0[2] as f32,
+    );
+    let bevy_pose_rotation = Quat::from_xyzw(
+        nalgebra_pose_rotation.i,
+        nalgebra_pose_rotation.j,
+        nalgebra_pose_rotation.k,
+        nalgebra_pose_rotation.w,
+    );
+
+    (bevy_pose_translation, bevy_pose_rotation)
+}
+
+fn apply_visual_pose_offset(
+    mut body_translation: Vec3,
+    body_rotation: Quat,
+    pose_translation: Vec3,
+    pose_rotation: Quat,
+) -> (Vec3, Quat) {
+    body_translation += body_rotation * pose_translation;
+    let final_rotation = body_rotation * pose_rotation;
+    (body_translation, final_rotation)
+}
+
 fn sync_robot_geometry(
     mut q_rapier_robot_bodies: Query<(Entity, &mut Transform, &mut URDFRobotRigidBodyHandle)>,
     q_rapier_rigid_body_set: Query<(&RapierRigidBodySet,)>,
-    mut counter: ResMut<SyncGeometryCounter>,
 ) {
-    // return;
-
     for rapier_rigid_body_set in q_rapier_rigid_body_set.iter() {
         for (_, mut transform, body_handle) in q_rapier_robot_bodies.iter_mut() {
             if let Some(robot_body) = rapier_rigid_body_set
@@ -229,58 +273,25 @@ fn sync_robot_geometry(
                 .bodies
                 .get(body_handle.rigid_body_handle)
             {
-                // Only run for exactly 10 iterations
-                if counter.count >= 20 {
-                    return;
-                }
-                counter.count += 1;
-                let visual_pose = body_handle.visual_pose.clone();
+                let visual_pose = &body_handle.visual_pose;
 
                 // Get body transform from Rapier
-                let nalgebra_body_translation = robot_body.position().translation.vector;
-                let mut bevy_body_translation = Vec3::new(
-                    nalgebra_body_translation.x,
-                    nalgebra_body_translation.y,
-                    nalgebra_body_translation.z,
-                );
-                let nalgebra_body_rotation = robot_body.position().rotation;
-
-                // Convert body rotation to Bevy quaternion (correct component order)
-                let bevy_body_rotation = Quat::from_xyzw(
-                    nalgebra_body_rotation.i,
-                    nalgebra_body_rotation.j,
-                    nalgebra_body_rotation.k,
-                    nalgebra_body_rotation.w,
-                );
+                let (body_translation, body_rotation) =
+                    extract_body_transform_from_rapier(robot_body);
 
                 // Get visual pose offset
-                let bevy_pose_translation = Vec3::new(
-                    visual_pose.xyz.0[0] as f32,
-                    visual_pose.xyz.0[1] as f32,
-                    visual_pose.xyz.0[2] as f32,
-                );
-                let nalgebra_pose_rotation = UnitQuaternion::from_euler_angles(
-                    visual_pose.rpy.0[0] as f32,
-                    visual_pose.rpy.0[1] as f32,
-                    visual_pose.rpy.0[2] as f32,
-                );
-                let bevy_pose_rotation = Quat::from_xyzw(
-                    nalgebra_pose_rotation.i,
-                    nalgebra_pose_rotation.j,
-                    nalgebra_pose_rotation.k,
-                    nalgebra_pose_rotation.w,
-                );
+                let (pose_translation, pose_rotation) = extract_visual_pose_offset(visual_pose);
 
                 // Apply pose offset to body transform
-                bevy_body_translation += bevy_body_rotation * bevy_pose_translation;
-                let final_rotation = bevy_body_rotation * bevy_pose_rotation;
-
-                // Convert to Bevy coordinate system
-                let bevy_translation = rapier_to_bevy_rotation().mul_vec3(bevy_body_translation);
-                let bevy_rotation = rapier_to_bevy_rotation() * final_rotation;
+                let (final_translation, final_rotation) = apply_visual_pose_offset(
+                    body_translation,
+                    body_rotation,
+                    pose_translation,
+                    pose_rotation,
+                );
 
                 *transform =
-                    Transform::from_translation(bevy_translation).with_rotation(bevy_rotation);
+                    Transform::from_translation(final_translation).with_rotation(final_rotation);
             }
         }
     }
