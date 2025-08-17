@@ -57,8 +57,12 @@ pub fn get_link_transforms(
         );
         let rotation = isometry.rotation * rotation;
 
-        urdf_robot.links[i].inertial.origin.rpy =
-            Vec3([position.x as f64, position.y as f64, position.z as f64]);
+        // urdf_robot.links[i].inertial.origin.xyz =
+        // Vec3([position.x as f64, position.y as f64, position.z as f64]);
+
+        // let rpy = rotation.euler_angles();
+
+        // urdf_robot.links[i].inertial.origin.rpy = Vec3([rpy.0 as f64, rpy.1 as f64, rpy.2 as f64]);
 
         transforms.insert(link_name.clone(), LinkTransform { position, rotation });
     }

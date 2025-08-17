@@ -75,7 +75,7 @@ impl AssetLoader for RpyAssetLoader {
             enable_joint_collisions: false,
             apply_imported_mass_props: true,
             make_roots_fixed: settings.make_roots_fixed,
-            shift: isometry,
+            // shift: isometry,
             ..Default::default()
         };
 
@@ -115,7 +115,7 @@ impl AssetLoader for RpyAssetLoader {
 
         // fix joint positions
         let mut kinematic_isometry = isometry.clone();
-        kinematic_isometry.rotation = UnitQuaternion::identity();
+        // kinematic_isometry.rotation = UnitQuaternion::identity();
         let kinematic_transforms = get_link_transforms(&mut robot, kinematic_isometry).unwrap();
 
         let urdf_robot = UrdfRobot::from_robot(
@@ -127,6 +127,7 @@ impl AssetLoader for RpyAssetLoader {
                 enable_joint_collisions: false,
                 apply_imported_mass_props: true,
                 make_roots_fixed: settings.make_roots_fixed,
+                // shift: Isometry::rotation(-Vector::x() * std::f32::consts::FRAC_PI_2),
                 ..Default::default()
             },
             mesh_dir,
