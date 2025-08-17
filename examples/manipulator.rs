@@ -13,10 +13,6 @@ use bevy_urdf::plugin::RobotType;
 use bevy_urdf::plugin::UrdfPlugin;
 use bevy_urdf::spawn::{LoadRobot, RapierOption, RobotLoaded, SpawnRobot};
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
-
-use rapier3d::prelude::Group;
-use rapier3d::prelude::InteractionGroups;
-
 use rand::Rng;
 
 #[derive(Resource)]
@@ -121,13 +117,14 @@ fn control_motors(
     robot_handle: Res<UrdfRobotHandle>,
     mut ew_control_motors: EventWriter<ControlMotorPositions>,
 ) {
+    return;
     if let Some(handle) = robot_handle.0.clone() {
         let mut rng = rand::rng();
         let mut positions: Vec<f32> = Vec::new();
         let mut motor_props: Vec<MotorProps> = Vec::new();
 
         for _ in 0..50 {
-            positions.push(0.0); // rng.random_range(-5.0..5.0));
+            positions.push(rng.random_range(-5.0..5.0));
             motor_props.push(MotorProps {
                 stiffness: 17.8,
                 damping: 0.6,

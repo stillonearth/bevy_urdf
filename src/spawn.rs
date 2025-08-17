@@ -2,9 +2,9 @@ use std::{collections::HashMap, path::Path};
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use nalgebra::{Isometry, UnitQuaternion};
-use rapier3d::prelude::{InteractionGroups, MultibodyJointHandle, RigidBodyHandle, RigidBodySet};
-use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobotHandles};
+use nalgebra::UnitQuaternion;
+use rapier3d::prelude::{InteractionGroups, MultibodyJointHandle, RigidBodyHandle};
+use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobot, UrdfRobotHandles};
 use uav::dynamics::RotorState;
 
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
         try_extract_drone_aerodynamic_props, try_extract_drone_visual_and_dynamic_model_props,
         DroneDescriptor, DroneRotor,
     },
-    kinematics::{get_link_transforms, LinkTransform},
+    kinematics::LinkTransform,
     plugin::{
         extract_robot_geometry, rapier_to_bevy_rotation, ExtractedGeometry, URDFRobot,
         URDFRobotRigidBodyHandle,
@@ -103,7 +103,7 @@ fn try_create_drone_descriptor(
 }
 
 fn initialize_rapier_handles(
-    urdf_asset: &UrdfAsset,
+    urdf_robot: UrdfRobot,
     q_rapier_context: &mut Query<(
         Entity,
         &mut RapierRigidBodySet,
@@ -114,7 +114,6 @@ fn initialize_rapier_handles(
     for (_entity, mut rigid_body_set, mut collider_set, mut multibidy_joint_set) in
         q_rapier_context.iter_mut()
     {
-        let urdf_robot = urdf_asset.urdf_robot.clone();
         return urdf_robot.insert_using_multibody_joints(
             &mut rigid_body_set.bodies,
             &mut collider_set.colliders,
@@ -352,17 +351,14 @@ pub(crate) fn handle_spawn_robot(
             );
 
             // Initialize rapier handles
-            let rapier_handles = initialize_rapier_handles(urdf_asset, &mut q_rapier_context);
+
+            let rapier_handles =
+                initialize_rapier_handles(urdf_asset.urdf_robot.clone(), &mut q_rapier_context);
             let body_handles: Vec<RigidBodyHandle> =
                 rapier_handles.links.iter().map(|link| link.body).collect();
 
             // Extract geometries and get kinematic transforms
             let extracted_geometries = extract_robot_geometry(urdf_asset);
-
-            let mut kinematic_isometry = urdf_asset.isometry.clone();
-            kinematic_isometry.rotation = UnitQuaternion::identity();
-            let kinematic_transforms =
-                get_link_transforms(&urdf_asset.robot, kinematic_isometry).unwrap();
 
             assert_eq!(body_handles.len(), extracted_geometries.len());
 
@@ -391,7 +387,7 @@ pub(crate) fn handle_spawn_robot(
                 spawn_robot_geometries(
                     children,
                     &extracted_geometries,
-                    &kinematic_transforms,
+                    &urdf_asset.kinematic_transforms,
                     &body_handles,
                     drone_descriptor,
                     event,

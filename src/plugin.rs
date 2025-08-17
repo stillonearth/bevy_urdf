@@ -125,8 +125,6 @@ impl Plugin for UrdfPlugin {
     }
 }
 
-// Components
-
 #[derive(Component)]
 pub struct URDFRobot {
     pub handle: Handle<UrdfAsset>,

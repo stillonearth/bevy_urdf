@@ -1,14 +1,17 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use bevy::{
     asset::{io::Reader, AssetLoader, LoadContext},
     prelude::*,
 };
+use nalgebra::UnitQuaternion;
 use rapier3d::{na::Translation3, prelude::*};
 use rapier3d_urdf::{UrdfLoaderOptions, UrdfRobot};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use urdf_rs::Robot;
+
+use crate::kinematics::{get_link_transforms, LinkTransform};
 
 #[derive(Default)]
 pub struct RpyAssetLoader;
@@ -19,6 +22,7 @@ pub struct UrdfAsset {
     pub urdf_robot: UrdfRobot,
     pub xml_string: String,
     pub isometry: nalgebra::Isometry<f32, nalgebra::Unit<nalgebra::Quaternion<f32>>, 3>,
+    pub kinematic_transforms: HashMap<String, LinkTransform>,
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
@@ -78,7 +82,8 @@ impl AssetLoader for RpyAssetLoader {
         let mesh_dir = settings.clone().mesh_dir.unwrap_or("./".to_string());
         let mesh_dir = Path::new(&mesh_dir);
 
-        let (mut urdf_robot, robot) = UrdfRobot::from_str(content, options, mesh_dir).unwrap();
+        let (mut urdf_robot, mut robot) =
+            UrdfRobot::from_str(content, options.clone(), mesh_dir).unwrap();
         let mut robot_joints = urdf_robot.joints.clone();
 
         // hotfix robot revolute joints motors
@@ -108,11 +113,31 @@ impl AssetLoader for RpyAssetLoader {
             urdf_robot.links = robot_links;
         }
 
+        // fix joint positions
+        let mut kinematic_isometry = isometry.clone();
+        kinematic_isometry.rotation = UnitQuaternion::identity();
+        let kinematic_transforms = get_link_transforms(&mut robot, kinematic_isometry).unwrap();
+
+        let urdf_robot = UrdfRobot::from_robot(
+            &robot,
+            UrdfLoaderOptions {
+                create_colliders_from_visual_shapes: settings.create_colliders_from_visual_shapes,
+                create_colliders_from_collision_shapes: settings
+                    .create_colliders_from_collision_shapes,
+                enable_joint_collisions: false,
+                apply_imported_mass_props: true,
+                make_roots_fixed: settings.make_roots_fixed,
+                ..Default::default()
+            },
+            mesh_dir,
+        );
+
         Ok(UrdfAsset {
             robot,
             urdf_robot,
             xml_string: String::from(content),
             isometry: isometry,
+            kinematic_transforms,
         })
     }
 }
