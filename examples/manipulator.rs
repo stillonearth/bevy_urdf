@@ -127,7 +127,7 @@ fn control_motors(
         let mut motor_props: Vec<MotorProps> = Vec::new();
 
         for _ in 0..50 {
-            positions.push(0.0); // rng.random_range(-0.1..0.0));
+            positions.push(0.0); // rng.random_range(-5.0..5.0));
             motor_props.push(MotorProps {
                 stiffness: 17.8,
                 damping: 0.6,

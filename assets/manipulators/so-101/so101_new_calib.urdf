@@ -436,7 +436,8 @@
     <parent link="base_link"/>
     <child link="shoulder_link"/>
     <axis xyz="0 0 1"/>
-    <limit effort="10" velocity="10" lower="-1.91986" upper="1.91986"/>
+    <!-- -1.91986 -->
+    <limit effort="10" velocity="10" lower="-7" upper="0" />
   </joint>
 
   <transmission name="shoulder_pan_trans">
