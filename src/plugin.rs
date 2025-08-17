@@ -23,7 +23,10 @@ pub fn rapier_to_bevy_rotation() -> Quat {
 }
 
 use crate::{
-    control::{handle_control_motors, ControlMotors, SensorsRead, UAVStateUpdate},
+    control::{
+        handle_control_motor_positions, handle_control_motor_velocities, ControlMotorPositions,
+        ControlMotorVelocities, SensorsRead, UAVStateUpdate,
+    },
     drones::{
         handle_control_thrusts, render_drone_rotors, simulate_drone, switch_drone_physics,
         ControlThrusts,
@@ -58,7 +61,8 @@ where
                 .in_set(PhysicsSet::StepSimulation)
                 .into_configs(),
             PhysicsSet::SyncBackend => (
-                handle_control_motors,
+                handle_control_motor_velocities,
+                handle_control_motor_positions,
                 handle_control_thrusts,
                 handle_despawn_robot,
                 handle_load_robot,
@@ -92,7 +96,8 @@ impl<PhysicsHooksSystemParam> Default for UrdfPlugin<PhysicsHooksSystemParam> {
 impl Plugin for UrdfPlugin {
     fn build(&self, app: &mut App) {
         app.init_asset_loader::<urdf_asset_loader::RpyAssetLoader>()
-            .add_event::<ControlMotors>()
+            .add_event::<ControlMotorVelocities>()
+            .add_event::<ControlMotorPositions>()
             .add_event::<ControlThrusts>()
             .add_event::<DespawnRobot>()
             .add_event::<LoadRobot>()
@@ -168,8 +173,6 @@ pub struct URDFRobotRigidBodyHandle {
     pub rigid_body_handle: RigidBodyHandle,
     pub visual_pose: Pose,
 }
-
-// Plugin
 
 pub struct ExtractedGeometry {
     pub index: usize,

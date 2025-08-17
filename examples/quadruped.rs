@@ -8,7 +8,7 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
 
-use bevy_urdf::control::{ControlMotors, SensorsRead};
+use bevy_urdf::control::{ControlMotorVelocities, SensorsRead};
 use bevy_urdf::plugin::RobotType;
 use bevy_urdf::plugin::UrdfPlugin;
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
@@ -161,7 +161,7 @@ fn robot_lifecycle(
 
 fn control_motors(
     robot_handle: Res<UrdfRobotHandle>,
-    mut ew_control_motors: EventWriter<ControlMotors>,
+    mut ew_control_motors: EventWriter<ControlMotorVelocities>,
 ) {
     if let Some(handle) = robot_handle.0.clone() {
         let mut rng = rand::rng();
@@ -171,7 +171,7 @@ fn control_motors(
             velocities.push(rng.random_range(-5.0..5.0));
         }
 
-        ew_control_motors.write(ControlMotors { handle, velocities });
+        ew_control_motors.write(ControlMotorVelocities { handle, velocities });
     }
 }
 
