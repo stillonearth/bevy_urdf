@@ -81,22 +81,6 @@ pub struct LoadRobot {
     pub marker: Option<u32>,
 }
 
-pub fn apply_transforms_to_rapier(
-    transforms: &HashMap<String, LinkTransform>,
-    link_to_body_map: &HashMap<String, RigidBodyHandle>,
-    rigid_body_set: &mut RigidBodySet,
-) {
-    for (link_name, transform) in transforms {
-        if let Some(body_handle) = link_to_body_map.get(link_name) {
-            if let Some(rigid_body) = rigid_body_set.get_mut(*body_handle) {
-                let position = Isometry::from_parts(transform.position.into(), transform.rotation);
-                rigid_body.set_position(position, true);
-                println!("~~~");
-            }
-        }
-    }
-}
-
 fn try_create_drone_descriptor(
     robot_type: RobotType,
     drone_descriptor: Option<DroneDescriptor>,
@@ -374,8 +358,11 @@ pub(crate) fn handle_spawn_robot(
 
             // Extract geometries and get kinematic transforms
             let extracted_geometries = extract_robot_geometry(urdf_asset);
+
+            let mut kinematic_isometry = urdf_asset.isometry.clone();
+            kinematic_isometry.rotation = UnitQuaternion::identity();
             let kinematic_transforms =
-                get_link_transforms(&urdf_asset.robot, urdf_asset.isometry).unwrap();
+                get_link_transforms(&urdf_asset.robot, kinematic_isometry).unwrap();
 
             assert_eq!(body_handles.len(), extracted_geometries.len());
 

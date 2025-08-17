@@ -106,7 +106,7 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
         urdf_path: "manipulators/so-101/so101_new_calib.urdf".to_string(),
         mesh_dir: "assets/manipulators/so-101/".to_string(),
         rapier_options: RapierOption {
-            interaction_groups: Some(InteractionGroups::new(Group::GROUP_4, Group::ALL).into()),
+            interaction_groups: None,
             translation_shift: None,
             create_colliders_from_visual_shapes: false,
             create_colliders_from_collision_shapes: true,
