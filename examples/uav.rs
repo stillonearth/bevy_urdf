@@ -1,4 +1,4 @@
-use bevy::input::{keyboard::KeyCode, ButtonInput};
+use bevy::input::keyboard::KeyCode;
 use bevy::{
     color::palettes::css::WHITE, input::common_conditions::input_toggle_active, prelude::*,
 };
@@ -9,14 +9,13 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_obj::ObjPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
-use bevy_urdf::{CameraControlPlugin, RobotType, RotateCamera};
+use bevy_urdf::RobotType;
 use nalgebra::{UnitQuaternion, Vector3};
 
-use bevy_urdf::drones::{ControlThrusts, DroneDescriptor};
-use bevy_urdf::events::{LoadRobot, RobotLoaded};
-use bevy_urdf::events::{RapierOption, SpawnRobot};
+use bevy_urdf::drones::{ControlThrusts, UAVDescriptor};
 use bevy_urdf::plugin::UrdfPlugin;
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
+use bevy_urdf::{LoadRobot, RapierOption, RobotLoaded, SpawnRobot};
 
 fn main() {
     let mut controller = uav::control::QuadcopterController::new(
@@ -62,7 +61,6 @@ fn main() {
             },
             InfiniteGridPlugin,
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
-            CameraControlPlugin,
         ))
         .init_state::<AppState>()
         .insert_resource(MovementSettings {
@@ -79,7 +77,6 @@ fn main() {
         .insert_resource(UrdfRobotHandle(None))
         .add_systems(Startup, setup)
         .add_systems(Update, control_thrusts)
-        .add_systems(Update, camera_angle_input)
         .add_systems(Update, start_simulation.run_if(in_state(AppState::Loading)))
         .run();
 }
@@ -105,9 +102,9 @@ fn start_simulation(
             handle: event.handle.clone(),
             mesh_dir: event.mesh_dir.clone(),
             parent_entity: Some(q_crazflie.iter().last().unwrap().0),
-            robot_type: RobotType::Drone,
-            drone_descriptor: event.drone_descriptor.clone(),
-            uuv_descriptor: event.uuv_descriptor.clone(),
+            robot_type: RobotType::UAV,
+            uav_descriptor: event.uav_descriptor.clone(),
+            uuv_descriptor: None,
         });
         state.set(AppState::Simulation);
         commands.insert_resource(UrdfRobotHandle(Some(event.handle.clone())));
@@ -118,7 +115,7 @@ fn control_thrusts(
     robot_handle: Res<UrdfRobotHandle>,
     mut ew_control_motors: EventWriter<ControlThrusts>,
     mut controller: ResMut<QuadcopterController>,
-    q_drone: Query<(Entity, &DroneDescriptor)>,
+    q_drone: Query<(Entity, &UAVDescriptor)>,
 ) {
     if let Some(handle) = robot_handle.0.clone() {
         for (_, drone_descriptor) in q_drone.iter() {
@@ -199,7 +196,7 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
 
     // load robot
     ew_load_robot.send(LoadRobot {
-        robot_type: RobotType::NotDrone,
+        robot_type: RobotType::Other,
         urdf_path: "quadrotors/crazyflie/cf2x.urdf".to_string(),
         mesh_dir: "assets/quadrotors/crazyflie/".to_string(),
         marker: None,
@@ -207,36 +204,10 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
             create_colliders_from_collision_shapes: true,
             create_colliders_from_visual_shapes: false,
             interaction_groups: None,
-            translation_shift: Some(Vec3::new(0.0, 1.0, 0.0)),
+            translation_shift: None,
+            make_roots_fixed: false,
         },
-        drone_descriptor: None,
+        uav_descriptor: None,
         uuv_descriptor: None,
     });
-}
-
-fn camera_angle_input(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut ew_rotate: EventWriter<RotateCamera>,
-) {
-    let mut delta_yaw = 0.0;
-    let mut delta_pitch = 0.0;
-    let step = 0.05;
-    if keyboard_input.pressed(KeyCode::ArrowLeft) {
-        delta_yaw += step;
-    }
-    if keyboard_input.pressed(KeyCode::ArrowRight) {
-        delta_yaw -= step;
-    }
-    if keyboard_input.pressed(KeyCode::ArrowUp) {
-        delta_pitch += step;
-    }
-    if keyboard_input.pressed(KeyCode::ArrowDown) {
-        delta_pitch -= step;
-    }
-    if delta_yaw != 0.0 || delta_pitch != 0.0 {
-        ew_rotate.send(RotateCamera {
-            delta_yaw,
-            delta_pitch,
-        });
-    }
 }

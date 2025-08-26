@@ -29,6 +29,7 @@ uom = "0.37"
 uav = { version = "0.1.2" }
 roxmltree = "0.20"
 queues = "1.0.2"
+k = "0.32"
 
 [patch.crates-io]
 fast_ode = { path = "patches/fast_ode-1.0.0" }
@@ -51,3 +52,4 @@ actix-web = "4.4"
 tokio = { version = "1.0", features = ["full"] }
 env_logger = "0.10"
 bevy_infinite_grid = { git = "https://github.com/ForesightMiningSoftwareCorporation/bevy_infinite_grid", branch = "main" }
+bevy_panorbit_camera = {version = "0.27", features = ["bevy_egui"] }

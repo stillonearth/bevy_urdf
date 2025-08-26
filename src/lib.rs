@@ -1,11 +1,10 @@
-pub mod camera;
+pub mod control;
 pub mod drones;
-pub mod events;
+pub mod kinematics;
 pub mod plugin;
+pub mod spawn;
 pub mod urdf_asset_loader;
 pub mod uuv;
 
-pub use camera::*;
 pub use plugin::*;
-
-pub use uav;
+pub use spawn::*;

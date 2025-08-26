@@ -12,20 +12,29 @@ use bevy_rapier3d::{
     plugin::{NoUserData, PhysicsSet},
     prelude::{BevyPhysicsHooks, RapierContextJoints, RapierRigidBodySet},
 };
+use nalgebra::UnitQuaternion;
 use rapier3d::prelude::{Collider, MultibodyJointHandle, RigidBodyHandle};
 use rapier3d_urdf::UrdfRobotHandles;
-use urdf_rs::{Geometry, Pose};
+use urdf_rs::{Geometry, Link, Pose};
+
+/// Coordinate system conversion from Rapier to Bevy
+pub fn rapier_to_bevy_rotation() -> Quat {
+    Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)
+}
 
 use crate::{
+    control::{
+        handle_control_motor_positions, handle_control_motor_velocities, ControlFins,
+        ControlMotorPositions, ControlMotorVelocities, ControlThrusters, SensorsRead,
+        UAVStateUpdate, UUVStateUpdate,
+    },
     drones::{
         handle_control_thrusts, render_drone_rotors, simulate_drone, switch_drone_physics,
         ControlThrusts,
     },
-    events::{
-        handle_control_motors, handle_despawn_robot, handle_load_robot, handle_spawn_robot,
-        handle_wait_robot_loaded, ControlFins, ControlMotors, ControlThrusters, DespawnRobot,
-        LoadRobot, RobotLoaded, RobotSpawned, SensorsRead, SpawnRobot, UAVStateUpdate,
-        UuvStateUpdate, WaitRobotLoaded,
+    spawn::{
+        handle_despawn_robot, handle_load_robot, handle_spawn_robot, handle_wait_robot_loaded,
+        DespawnRobot, LoadRobot, RobotLoaded, RobotSpawned, SpawnRobot, WaitRobotLoaded,
     },
     urdf_asset_loader::{self, UrdfAsset},
     uuv::{handle_control_fins, handle_control_thrusters, simulate_uuv},
@@ -50,12 +59,13 @@ where
     /// [`with_default_system_setup(false)`](Self::with_default_system_setup).
     pub fn get_systems(set: PhysicsSet) -> ScheduleConfigs<ScheduleSystem> {
         match set {
-            PhysicsSet::StepSimulation => (switch_drone_physics, simulate_drone, simulate_uuv)
-                .chain()
-                .in_set(PhysicsSet::StepSimulation)
-                .into_configs(),
+            PhysicsSet::StepSimulation => ((switch_drone_physics, simulate_drone, simulate_uuv)
+                .chain())
+            .in_set(PhysicsSet::StepSimulation)
+            .into_configs(),
             PhysicsSet::SyncBackend => (
-                handle_control_motors,
+                handle_control_motor_velocities,
+                handle_control_motor_positions,
                 handle_control_thrusts,
                 handle_control_thrusters,
                 handle_control_fins,
@@ -69,7 +79,7 @@ where
             PhysicsSet::Writeback => ((
                 sync_robot_geometry,
                 render_drone_rotors,
-                adjust_urdf_robot_mean_position,
+                // adjust_urdf_robot_mean_position,
             )
                 .chain())
             .in_set(PhysicsSet::Writeback)
@@ -91,7 +101,8 @@ impl<PhysicsHooksSystemParam> Default for UrdfPlugin<PhysicsHooksSystemParam> {
 impl Plugin for UrdfPlugin {
     fn build(&self, app: &mut App) {
         app.init_asset_loader::<urdf_asset_loader::RpyAssetLoader>()
-            .add_event::<ControlMotors>()
+            .add_event::<ControlMotorVelocities>()
+            .add_event::<ControlMotorPositions>()
             .add_event::<ControlThrusts>()
             .add_event::<ControlThrusters>()
             .add_event::<ControlFins>()
@@ -101,7 +112,7 @@ impl Plugin for UrdfPlugin {
             .add_event::<RobotSpawned>()
             .add_event::<SensorsRead>()
             .add_event::<UAVStateUpdate>()
-            .add_event::<UuvStateUpdate>()
+            .add_event::<UUVStateUpdate>()
             .add_event::<SpawnRobot>()
             .add_event::<WaitRobotLoaded>()
             .init_asset::<urdf_asset_loader::UrdfAsset>();
@@ -122,8 +133,6 @@ impl Plugin for UrdfPlugin {
     }
 }
 
-// Components
-
 #[derive(Component)]
 pub struct URDFRobot {
     pub handle: Handle<UrdfAsset>,
@@ -133,9 +142,10 @@ pub struct URDFRobot {
 
 #[derive(Clone, PartialEq, PartialOrd, Copy, Debug, Reflect)]
 pub enum RobotType {
-    Drone,
-    NotDrone,
-    Uuv,
+    UAV,
+    UUV,
+    Other,
+    Manipulator,
 }
 
 impl FromStr for RobotType {
@@ -143,9 +153,10 @@ impl FromStr for RobotType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "drone" => Ok(RobotType::Drone),
-            "notdrone" | "not_drone" | "not-drone" => Ok(RobotType::NotDrone),
-            "uuv" => Ok(RobotType::Uuv),
+            "drone" | "uav" => Ok(RobotType::UAV),
+            "notdrone" | "not_drone" | "not-drone" | "other" => Ok(RobotType::Other),
+            "manipulator" => Ok(RobotType::Manipulator),
+            "uuv" => Ok(RobotType::UUV),
             _ => Err(format!("Invalid robot type: '{s}'")),
         }
     }
@@ -165,86 +176,136 @@ impl From<&str> for RobotType {
     }
 }
 
-#[derive(Component, Default, Deref)]
-pub struct URDFRobotRigidBodyHandle(pub RigidBodyHandle);
+#[derive(Component)]
+pub struct URDFRobotRigidBodyHandle {
+    pub rigid_body_handle: RigidBodyHandle,
+    pub visual_pose: Pose,
+}
 
-// Plugin
+pub struct ExtractedGeometry {
+    pub index: usize,
+    pub geometries: Vec<Geometry>,
+    pub inertia_pose: Pose,
+    pub visual_poses: Vec<Pose>,
+    pub colliders: Vec<Collider>,
+    pub link: Link,
+}
 
 #[allow(clippy::type_complexity)]
-pub fn extract_robot_geometry(
-    robot: &UrdfAsset,
-) -> Vec<(
-    usize,
-    Option<Geometry>,
-    Pose,
-    Option<Pose>,
-    Option<Collider>,
-)> {
-    let mut result: Vec<(
-        usize,
-        Option<Geometry>,
-        Pose,
-        Option<Pose>,
-        Option<Collider>,
-    )> = Vec::new();
+pub fn extract_robot_geometry(robot: &UrdfAsset) -> Vec<ExtractedGeometry> {
+    robot
+        .robot
+        .links
+        .iter()
+        .enumerate()
+        .map(|(index, link)| {
+            let colliders = robot.urdf_robot.links[index].colliders.clone();
+            let geometries = link
+                .visual
+                .iter()
+                .map(|visual| visual.geometry.clone())
+                .collect();
+            let visual_poses = link
+                .visual
+                .iter()
+                .map(|visual| visual.origin.clone())
+                .collect();
 
-    for (i, link) in robot.robot.links.iter().enumerate() {
-        let colliders = robot.urdf_robot.links[i].colliders.clone();
-        let collider = if colliders.len() == 1 {
-            Some(colliders[0].clone())
-        } else {
-            None
-        };
+            ExtractedGeometry {
+                index,
+                geometries,
+                inertia_pose: link.inertial.origin.clone(),
+                visual_poses,
+                link: link.clone(),
+                colliders,
+            }
+        })
+        .collect()
+}
 
-        let geometry = if !link.visual.is_empty() {
-            Some(link.visual[0].geometry.clone())
-        } else {
-            None
-        };
-        let inertia_pose = link.inertial.origin.clone();
-        let mut visual_pose: Option<Pose> = None;
+fn extract_body_transform_from_rapier(robot_body: &rapier3d::dynamics::RigidBody) -> (Vec3, Quat) {
+    let nalgebra_body_translation = robot_body.position().translation.vector;
+    let bevy_body_translation = Vec3::new(
+        nalgebra_body_translation.x,
+        nalgebra_body_translation.y,
+        nalgebra_body_translation.z,
+    );
 
-        if let Some(vp) = link.visual.last() {
-            visual_pose = Some(vp.origin.clone());
-        }
+    let nalgebra_body_rotation = robot_body.position().rotation;
+    let bevy_body_rotation = Quat::from_xyzw(
+        nalgebra_body_rotation.i,
+        nalgebra_body_rotation.j,
+        nalgebra_body_rotation.k,
+        nalgebra_body_rotation.w,
+    );
 
-        result.push((
-            i,
-            geometry.clone(),
-            inertia_pose.clone(),
-            visual_pose.clone(),
-            collider,
-        ));
-    }
+    (bevy_body_translation, bevy_body_rotation)
+}
 
-    result
+fn extract_visual_pose_offset(visual_pose: &urdf_rs::Pose) -> (Vec3, Quat) {
+    let bevy_pose_translation = Vec3::new(
+        visual_pose.xyz.0[0] as f32,
+        visual_pose.xyz.0[1] as f32,
+        visual_pose.xyz.0[2] as f32,
+    );
+
+    let nalgebra_pose_rotation = UnitQuaternion::from_euler_angles(
+        visual_pose.rpy.0[0] as f32,
+        visual_pose.rpy.0[1] as f32,
+        visual_pose.rpy.0[2] as f32,
+    );
+    let bevy_pose_rotation = Quat::from_xyzw(
+        nalgebra_pose_rotation.i,
+        nalgebra_pose_rotation.j,
+        nalgebra_pose_rotation.k,
+        nalgebra_pose_rotation.w,
+    );
+
+    (bevy_pose_translation, bevy_pose_rotation)
+}
+
+fn apply_visual_pose_offset(
+    mut body_translation: Vec3,
+    body_rotation: Quat,
+    pose_translation: Vec3,
+    pose_rotation: Quat,
+) -> (Vec3, Quat) {
+    body_translation += body_rotation * pose_translation;
+    let final_rotation = body_rotation * pose_rotation;
+    (body_translation, final_rotation)
 }
 
 fn sync_robot_geometry(
     mut q_rapier_robot_bodies: Query<(Entity, &mut Transform, &mut URDFRobotRigidBodyHandle)>,
     q_rapier_rigid_body_set: Query<(&RapierRigidBodySet,)>,
 ) {
+    // return;
     for rapier_rigid_body_set in q_rapier_rigid_body_set.iter() {
         for (_, mut transform, body_handle) in q_rapier_robot_bodies.iter_mut() {
-            if let Some(robot_body) = rapier_rigid_body_set.0.bodies.get(body_handle.0) {
-                let rapier_pos = robot_body.position();
-                let rapier_rot = rapier_pos.rotation;
+            if let Some(robot_body) = rapier_rigid_body_set
+                .0
+                .bodies
+                .get(body_handle.rigid_body_handle)
+            {
+                let visual_pose = &body_handle.visual_pose;
 
-                let quat_fix = Quat::from_rotation_z(std::f32::consts::PI)
-                    * Quat::from_rotation_y(std::f32::consts::PI);
-                let bevy_quat = quat_fix
-                    * Quat::from_array([rapier_rot.i, rapier_rot.j, rapier_rot.k, rapier_rot.w]);
+                // Get body transform from Rapier
+                let (body_translation, body_rotation) =
+                    extract_body_transform_from_rapier(robot_body);
 
-                let rapier_vec = Vec3::new(
-                    rapier_pos.translation.x,
-                    rapier_pos.translation.y,
-                    rapier_pos.translation.z,
+                // Get visual pose offset
+                let (pose_translation, pose_rotation) = extract_visual_pose_offset(visual_pose);
+
+                // Apply pose offset to body transform
+                let (final_translation, final_rotation) = apply_visual_pose_offset(
+                    body_translation,
+                    body_rotation,
+                    pose_translation,
+                    pose_rotation,
                 );
 
-                let bevy_vec = quat_fix.mul_vec3(rapier_vec);
-                let body_transform = Transform::from_translation(bevy_vec).with_rotation(bevy_quat);
-
-                *transform = body_transform;
+                *transform =
+                    Transform::from_translation(final_translation).with_rotation(final_rotation);
             }
         }
     }
@@ -270,8 +331,7 @@ fn adjust_urdf_robot_mean_position(
         }
     }
 
-    let quat_fix =
-        Quat::from_rotation_z(std::f32::consts::PI) * Quat::from_rotation_y(std::f32::consts::PI);
+    let quat_fix = Quat::from_rotation_z(std::f32::consts::PI);
     let mut mean_translations: HashMap<Handle<UrdfAsset>, Vec3> = HashMap::new();
 
     // Calculate mean translation for each URDF asset

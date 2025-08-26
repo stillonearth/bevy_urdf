@@ -1,18 +1,18 @@
-use bevy::input::{keyboard::KeyCode, ButtonInput};
+use bevy::input::keyboard::KeyCode;
 use bevy::{
     color::palettes::css::WHITE, input::common_conditions::input_toggle_active, prelude::*,
 };
 use bevy_flycam::prelude::*;
+use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_obj::ObjPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
-use bevy_urdf::events::{ControlThrusters, LoadRobot, RapierOption, RobotLoaded, SpawnRobot};
+use bevy_urdf::control::ControlThrusters;
 use bevy_urdf::plugin::{RobotType, UrdfPlugin};
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
-use bevy_urdf::{CameraControlPlugin, RotateCamera};
-use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
+use bevy_urdf::{LoadRobot, RapierOption, RobotLoaded, SpawnRobot};
 
 fn main() {
     App::new()
@@ -31,7 +31,6 @@ fn main() {
             },
             InfiniteGridPlugin,
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
-            CameraControlPlugin,
         ))
         .init_state::<AppState>()
         .insert_resource(MovementSettings {
@@ -47,7 +46,6 @@ fn main() {
         .insert_resource(UrdfRobotHandle(None))
         .add_systems(Startup, setup)
         .add_systems(Update, control_thrusters)
-        .add_systems(Update, camera_angle_input)
         .add_systems(Update, start_simulation.run_if(in_state(AppState::Loading)))
         .run();
 }
@@ -73,8 +71,8 @@ fn start_simulation(
             handle: event.handle.clone(),
             mesh_dir: event.mesh_dir.clone(),
             parent_entity: None,
-            robot_type: RobotType::Uuv,
-            drone_descriptor: None,
+            robot_type: RobotType::UUV,
+            uav_descriptor: None,
             uuv_descriptor: event.uuv_descriptor.clone(),
         });
         state.set(AppState::Simulation);
@@ -112,7 +110,7 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
     ));
 
     ew_load_robot.send(LoadRobot {
-        robot_type: RobotType::Uuv,
+        robot_type: RobotType::UUV,
         urdf_path: "uuvs/simple_uuv.urdf".to_string(),
         mesh_dir: "assets/uuvs/".to_string(),
         rapier_options: RapierOption {
@@ -120,36 +118,10 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
             translation_shift: Some(Vec3::new(0.0, 1.0, 0.0)),
             create_colliders_from_visual_shapes: false,
             create_colliders_from_collision_shapes: true,
+            make_roots_fixed: false,
         },
         marker: None,
-        drone_descriptor: None,
+        uav_descriptor: None,
         uuv_descriptor: None,
     });
-}
-
-fn camera_angle_input(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut ew_rotate: EventWriter<RotateCamera>,
-) {
-    let mut delta_yaw = 0.0;
-    let mut delta_pitch = 0.0;
-    let step = 0.05;
-    if keyboard_input.pressed(KeyCode::ArrowLeft) {
-        delta_yaw += step;
-    }
-    if keyboard_input.pressed(KeyCode::ArrowRight) {
-        delta_yaw -= step;
-    }
-    if keyboard_input.pressed(KeyCode::ArrowUp) {
-        delta_pitch += step;
-    }
-    if keyboard_input.pressed(KeyCode::ArrowDown) {
-        delta_pitch -= step;
-    }
-    if delta_yaw != 0.0 || delta_pitch != 0.0 {
-        ew_rotate.send(RotateCamera {
-            delta_yaw,
-            delta_pitch,
-        });
-    }
 }

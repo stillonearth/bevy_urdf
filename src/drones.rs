@@ -12,7 +12,7 @@ use nalgebra::{vector, Isometry3, Rotation3, UnitQuaternion, Vector3};
 use rapier3d::prelude::RigidBodyType;
 use roxmltree::Document;
 
-use crate::{events::UAVStateUpdate, urdf_asset_loader::UrdfAsset, URDFRobot};
+use crate::{control::UAVStateUpdate, urdf_asset_loader::UrdfAsset, URDFRobot};
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub enum DronePhysics {
@@ -31,10 +31,10 @@ pub enum FlightPhase {
 }
 
 #[derive(Component, Default, Debug, Clone)]
-pub struct DroneDescriptor {
-    pub aerodynamic_props: AerodynamicsProperties,
-    pub dynamics_model_props: DynamicsModelProperties,
-    pub visual_body_properties: VisualBodyProperties,
+pub struct UAVDescriptor {
+    pub aerodynamic_props: AerodynamicProps,
+    pub dynamics_model_props: DynamicModelProps,
+    pub visual_body_properties: VisualBodyProps,
     pub drone_physics: DronePhysics,
     pub thrust_commands: Vec<f32>,
     pub uav_state: uav::dynamics::State,
@@ -49,7 +49,7 @@ pub struct DroneRotor {
     pub rotor_index: usize,
 }
 
-impl DroneDescriptor {
+impl UAVDescriptor {
     fn set_uav_state(&mut self, new_state: uav::dynamics::State) {
         self.uav_state = new_state;
         // make configurable
@@ -63,7 +63,7 @@ impl DroneDescriptor {
 }
 
 #[derive(Default, Debug, Clone, Copy)]
-pub struct AerodynamicsProperties {
+pub struct AerodynamicProps {
     pub kf: f32,
     pub km: f32,
     pub thrust2weight: f32,
@@ -78,7 +78,7 @@ pub struct AerodynamicsProperties {
 }
 
 #[derive(Default, Debug, Clone)]
-pub struct DynamicsModelProperties {
+pub struct DynamicModelProps {
     pub mass: f32,
     pub ixx: f32,
     pub iyy: f32,
@@ -86,14 +86,14 @@ pub struct DynamicsModelProperties {
     pub rotor_positions: Vec<Vec3>,
 }
 
-impl DynamicsModelProperties {
+impl DynamicModelProps {
     pub fn n_rotors(&self) -> usize {
         self.rotor_positions.len()
     }
 }
 
 #[derive(Default, Debug, Clone)]
-pub struct VisualBodyProperties {
+pub struct VisualBodyProps {
     pub root_body_index: usize,
     pub rotor_body_indices: Vec<usize>,
     pub rotor_positions: Vec<Vec3>,
@@ -132,9 +132,9 @@ impl From<roxmltree::Error> for ParseError {
     }
 }
 
-pub fn try_extract_drone_aerodynamics_properties(
+pub fn try_extract_drone_aerodynamic_props(
     xml_content: &str,
-) -> Result<AerodynamicsProperties, ParseError> {
+) -> Result<AerodynamicProps, ParseError> {
     let doc = Document::parse(xml_content)?;
 
     // Find the properties element
@@ -143,7 +143,7 @@ pub fn try_extract_drone_aerodynamics_properties(
         .find(|n| n.has_tag_name("properties"))
         .ok_or(ParseError::MissingProperties)?;
 
-    let mut props = AerodynamicsProperties::default();
+    let mut props = AerodynamicProps::default();
 
     // Helper function to parse an attribute
     let parse_attr = |attr_name: &str| -> Result<Option<f32>, ParseError> {
@@ -205,12 +205,12 @@ pub fn try_extract_drone_aerodynamics_properties(
     Ok(props)
 }
 
-pub fn try_extract_drone_visual_and_dynamics_model_properties(
+pub fn try_extract_drone_visual_and_dynamic_model_props(
     xml_content: &str,
-) -> Result<(DynamicsModelProperties, VisualBodyProperties), Error> {
+) -> Result<(DynamicModelProps, VisualBodyProps), Error> {
     let urdf_robot = urdf_rs::read_from_string(xml_content)?;
-    let mut visual_body_props = VisualBodyProperties { ..default() };
-    let mut dynamics_model_properties = DynamicsModelProperties { ..default() };
+    let mut visual_body_props = VisualBodyProps { ..default() };
+    let mut dynamics_model_properties = DynamicModelProps { ..default() };
 
     for (index, link) in urdf_robot.links.iter().enumerate() {
         // probably it's a drone body
@@ -248,7 +248,7 @@ pub fn try_extract_drone_visual_and_dynamics_model_properties(
 
 pub(crate) fn handle_control_thrusts(
     mut er_control_thrusts: EventReader<ControlThrusts>,
-    mut q_urdf_robots: Query<(Entity, &URDFRobot, &mut DroneDescriptor)>,
+    mut q_urdf_robots: Query<(Entity, &URDFRobot, &mut UAVDescriptor)>,
 ) {
     // just copy thrusts to drone descriptor. uav will pick it and apply in dynamics model
     for event in er_control_thrusts.read() {
@@ -262,7 +262,7 @@ pub(crate) fn handle_control_thrusts(
 }
 
 pub(crate) fn switch_drone_physics(
-    mut q_urdf_robots: Query<(Entity, &Transform, &mut DroneDescriptor)>,
+    mut q_urdf_robots: Query<(Entity, &Transform, &mut UAVDescriptor)>,
 ) {
     for (_, _, mut drone) in q_urdf_robots.iter_mut() {
         if drone.state_log.is_empty() {
@@ -302,7 +302,7 @@ pub(crate) fn switch_drone_physics(
 }
 
 pub(crate) fn simulate_drone(
-    mut q_drones: Query<(Entity, &mut Transform, &URDFRobot, &mut DroneDescriptor)>,
+    mut q_drones: Query<(Entity, &mut Transform, &URDFRobot, &mut UAVDescriptor)>,
     mut q_drone_rotors: Query<(Entity, &ChildOf, &mut DroneRotor)>,
     mut q_rapier_context: Query<(
         Entity,
@@ -353,7 +353,6 @@ pub(crate) fn simulate_drone(
                 }
             }
 
-            // let (forces, torques) = quadrotor_dynamics(thrusts, drone.aerodynamic_props);
             let (forces, torques) = multirotor_dynamics(
                 &output_thusts,
                 &drone.aerodynamic_props,
@@ -458,8 +457,8 @@ pub(crate) fn simulate_drone(
 
 fn multirotor_dynamics(
     thrusts: &[f32],
-    aerodynamics_props: &AerodynamicsProperties,
-    dynamics_props: &DynamicsModelProperties,
+    aerodynamics_props: &AerodynamicProps,
+    dynamics_props: &DynamicModelProps,
 ) -> ([f32; 3], [f32; 3]) {
     // Ensure we have the same number of thrusts as rotors
     assert_eq!(thrusts.len(), dynamics_props.n_rotors());
@@ -500,25 +499,15 @@ fn multirotor_dynamics(
     )
 }
 
-pub(crate) fn render_drone_rotors(
-    mut q_rotors: Query<(Entity, &ChildOf, &mut Transform, &DroneRotor)>,
-    q_bodies: Query<(Entity, &ChildOf, &Transform), Without<DroneRotor>>,
-) {
+pub(crate) fn render_drone_rotors(mut q_rotors: Query<(Entity, &mut Transform, &DroneRotor)>) {
     let quat_fix = Quat::from_rotation_x(std::f32::consts::PI / 2.0);
-    for (_, child_of, mut transform, rotor) in q_rotors.iter_mut() {
-        let parent_entity = child_of.parent();
-        if let Some((_, _, root_transform)) = q_bodies
-            .iter()
-            .find(|(_, child_of, _)| child_of.parent() == parent_entity)
-        {
-            let rotor_direction = if rotor.rotor_index % 2 == 0 {
-                -1.0
-            } else {
-                1.0
-            };
-            transform.translation += root_transform.rotation * rotor.transform.translation;
-            transform.rotation =
-                quat_fix * Quat::from_rotation_z(rotor_direction * rotor.state.current_angle);
-        }
+    for (_, mut transform, rotor) in q_rotors.iter_mut() {
+        let rotor_direction = if rotor.rotor_index % 2 == 0 {
+            -1.0
+        } else {
+            1.0
+        };
+        transform.rotation =
+            quat_fix * Quat::from_rotation_z(rotor_direction * rotor.state.current_angle);
     }
 }

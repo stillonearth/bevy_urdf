@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use bevy::{
     asset::{io::Reader, AssetLoader, LoadContext},
@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use urdf_rs::Robot;
 
+use crate::kinematics::{get_link_transforms, LinkTransform};
+
 #[derive(Default)]
 pub struct RpyAssetLoader;
 
@@ -18,6 +20,8 @@ pub struct UrdfAsset {
     pub robot: Robot,
     pub urdf_robot: UrdfRobot,
     pub xml_string: String,
+    pub isometry: nalgebra::Isometry<f32, nalgebra::Unit<nalgebra::Quaternion<f32>>, 3>,
+    pub kinematic_transforms: HashMap<String, LinkTransform>,
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
@@ -27,6 +31,7 @@ pub struct RpyAssetLoaderSettings {
     pub translation_shift: Option<Vec3>,
     pub create_colliders_from_visual_shapes: bool,
     pub create_colliders_from_collision_shapes: bool,
+    pub make_roots_fixed: bool,
 }
 
 #[non_exhaustive]
@@ -51,9 +56,10 @@ impl AssetLoader for RpyAssetLoader {
         reader.read_to_end(&mut bytes).await?;
         let content = std::str::from_utf8(&bytes).unwrap();
 
+        // Z-up to Y-up.
         let mut isometry: nalgebra::Isometry<f32, nalgebra::Unit<nalgebra::Quaternion<f32>>, 3> =
-            Isometry::rotation(Vector::x() * std::f32::consts::FRAC_PI_2)
-                * Isometry::rotation(Vector::y() * std::f32::consts::FRAC_PI_2 * 2.0);
+            Isometry::identity();
+
         if let Some(translaction_shift) = settings.translation_shift {
             isometry.append_translation_mut(&Translation3::new(
                 translaction_shift.x,
@@ -63,12 +69,11 @@ impl AssetLoader for RpyAssetLoader {
         }
 
         let options = UrdfLoaderOptions {
-            create_colliders_from_visual_shapes: true,
-            create_colliders_from_collision_shapes: false,
+            create_colliders_from_visual_shapes: settings.create_colliders_from_visual_shapes,
+            create_colliders_from_collision_shapes: settings.create_colliders_from_collision_shapes,
             enable_joint_collisions: false,
             apply_imported_mass_props: true,
-            make_roots_fixed: false,
-            // Z-up to Y-up.
+            make_roots_fixed: settings.make_roots_fixed,
             shift: isometry,
             ..Default::default()
         };
@@ -76,7 +81,8 @@ impl AssetLoader for RpyAssetLoader {
         let mesh_dir = settings.clone().mesh_dir.unwrap_or("./".to_string());
         let mesh_dir = Path::new(&mesh_dir);
 
-        let (mut urdf_robot, robot) = UrdfRobot::from_str(content, options, mesh_dir).unwrap();
+        let (mut urdf_robot, mut robot) =
+            UrdfRobot::from_str(content, options.clone(), mesh_dir).unwrap();
         let mut robot_joints = urdf_robot.joints.clone();
 
         // hotfix robot revolute joints motors
@@ -87,7 +93,7 @@ impl AssetLoader for RpyAssetLoader {
                 robot_joints[index].joint = joint;
             }
         }
-        urdf_robot.joints = robot_joints;
+        urdf_robot.joints = robot_joints.clone();
 
         // apply custom collision groups
         if let Some(mut adjusted_interaction_groups) = settings.interaction_groups {
@@ -106,10 +112,33 @@ impl AssetLoader for RpyAssetLoader {
             urdf_robot.links = robot_links;
         }
 
+        // fix joint positions
+        let kinematic_isometry = isometry.clone();
+        let kinematic_transforms = get_link_transforms(&mut robot, kinematic_isometry).unwrap();
+
+        let mut urdf_robot = UrdfRobot::from_robot(
+            &robot,
+            UrdfLoaderOptions {
+                create_colliders_from_visual_shapes: settings.create_colliders_from_visual_shapes,
+                create_colliders_from_collision_shapes: settings
+                    .create_colliders_from_collision_shapes,
+                enable_joint_collisions: false,
+                apply_imported_mass_props: true,
+                make_roots_fixed: settings.make_roots_fixed,
+                shift: Isometry::rotation(-Vector::x() * std::f32::consts::FRAC_PI_2),
+                ..Default::default()
+            },
+            mesh_dir,
+        );
+
+        urdf_robot.joints = robot_joints.clone();
+
         Ok(UrdfAsset {
             robot,
             urdf_robot,
             xml_string: String::from(content),
+            isometry: isometry,
+            kinematic_transforms,
         })
     }
 }

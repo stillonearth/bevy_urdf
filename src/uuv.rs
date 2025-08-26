@@ -5,7 +5,7 @@ use anyhow::Error;
 use bevy::prelude::*;
 
 use crate::{
-    events::{ControlFins, ControlThrusters, UuvStateUpdate},
+    control::{ControlFins, ControlThrusters, UUVStateUpdate},
     URDFRobot,
 };
 
@@ -26,7 +26,7 @@ pub struct UuvState {
 }
 
 #[derive(Component, Debug, Clone)]
-pub struct UuvDescriptor {
+pub struct UUVDescriptor {
     pub hydrodynamic_props: HydrodynamicProperties,
     pub thrust_force: Vec3,
     pub thrust_torque: Vec3,
@@ -37,7 +37,7 @@ pub struct UuvDescriptor {
     pub(crate) state_log: VecDeque<UuvState>,
 }
 
-impl Default for UuvDescriptor {
+impl Default for UUVDescriptor {
     fn default() -> Self {
         Self {
             hydrodynamic_props: HydrodynamicProperties {
@@ -57,7 +57,7 @@ impl Default for UuvDescriptor {
     }
 }
 
-impl UuvDescriptor {
+impl UUVDescriptor {
     fn push_state(&mut self, state: UuvState) {
         self.state = state;
         if self.state_log.len() >= 30 {
@@ -86,9 +86,9 @@ pub fn try_extract_uuv_thruster_positions(xml_content: &str) -> Result<Vec<Vec3>
 }
 
 pub(crate) fn simulate_uuv(
-    mut q_uuvs: Query<(&mut Transform, &URDFRobot, &mut UuvDescriptor)>,
+    mut q_uuvs: Query<(&mut Transform, &URDFRobot, &mut UUVDescriptor)>,
     time: Res<Time>,
-    mut ew_state: EventWriter<UuvStateUpdate>,
+    mut ew_state: EventWriter<UUVStateUpdate>,
 ) {
     for (mut transform, robot, mut descriptor) in q_uuvs.iter_mut() {
         let dt = time.delta_secs();
@@ -121,7 +121,7 @@ pub(crate) fn simulate_uuv(
         descriptor.push_state(state);
         *transform = Transform::from_translation(state.position).with_rotation(state.orientation);
 
-        ew_state.write(UuvStateUpdate {
+        ew_state.write(UUVStateUpdate {
             handle: robot.handle.clone(),
             uuv_state: state,
         });
@@ -130,7 +130,7 @@ pub(crate) fn simulate_uuv(
 
 pub(crate) fn handle_control_thrusters(
     mut er_thrusters: EventReader<ControlThrusters>,
-    mut q_uuvs: Query<(&URDFRobot, &mut UuvDescriptor)>,
+    mut q_uuvs: Query<(&URDFRobot, &mut UUVDescriptor)>,
 ) {
     for event in er_thrusters.read() {
         for (robot, mut descriptor) in q_uuvs.iter_mut() {
@@ -144,7 +144,7 @@ pub(crate) fn handle_control_thrusters(
 
 pub(crate) fn handle_control_fins(
     mut er_fins: EventReader<ControlFins>,
-    mut q_uuvs: Query<(&URDFRobot, &mut UuvDescriptor)>,
+    mut q_uuvs: Query<(&URDFRobot, &mut UUVDescriptor)>,
 ) {
     for event in er_fins.read() {
         for (robot, mut descriptor) in q_uuvs.iter_mut() {

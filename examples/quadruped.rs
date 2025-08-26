@@ -8,13 +8,11 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
 
-use bevy::input::{keyboard::KeyCode, ButtonInput};
-use bevy_urdf::events::{ControlMotors, DespawnRobot, LoadRobot, RobotLoaded, SensorsRead};
-use bevy_urdf::events::{RapierOption, SpawnRobot};
+use bevy_urdf::control::{ControlMotorVelocities, SensorsRead};
 use bevy_urdf::plugin::RobotType;
 use bevy_urdf::plugin::UrdfPlugin;
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
-use bevy_urdf::{CameraControlPlugin, RotateCamera};
+use bevy_urdf::{DespawnRobot, LoadRobot, RapierOption, RobotLoaded, SpawnRobot};
 
 use rand::Rng;
 
@@ -38,7 +36,6 @@ fn main() {
             },
             InfiniteGridPlugin,
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
-            CameraControlPlugin,
         ))
         .init_state::<AppState>()
         .insert_resource(MovementSettings {
@@ -62,7 +59,6 @@ fn main() {
                 check_rapier_state.after(robot_lifecycle),
             ),
         )
-        .add_systems(Update, camera_angle_input)
         .add_systems(Update, start_simulation.run_if(in_state(AppState::Loading)))
         .run();
 }
@@ -84,8 +80,8 @@ fn start_simulation(
             handle: event.handle.clone(),
             mesh_dir: event.mesh_dir.clone(),
             parent_entity: None,
-            robot_type: RobotType::NotDrone,
-            drone_descriptor: None,
+            robot_type: RobotType::Other,
+            uav_descriptor: None,
             uuv_descriptor: None,
         });
         state.set(AppState::Simulation);
@@ -166,7 +162,7 @@ fn robot_lifecycle(
 
 fn control_motors(
     robot_handle: Res<UrdfRobotHandle>,
-    mut ew_control_motors: EventWriter<ControlMotors>,
+    mut ew_control_motors: EventWriter<ControlMotorVelocities>,
 ) {
     if let Some(handle) = robot_handle.0.clone() {
         let mut rng = rand::rng();
@@ -176,7 +172,7 @@ fn control_motors(
             velocities.push(rng.random_range(-5.0..5.0));
         }
 
-        ew_control_motors.write(ControlMotors { handle, velocities });
+        ew_control_motors.write(ControlMotorVelocities { handle, velocities });
     }
 }
 
@@ -192,7 +188,7 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
     // Scene
     commands.insert_resource(AmbientLight {
         color: WHITE.into(),
-        brightness: 300.0,
+        brightness: 500.0,
         ..default()
     });
 
@@ -208,44 +204,18 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
 
     // load robot
     ew_load_robot.send(LoadRobot {
-        robot_type: RobotType::NotDrone,
+        robot_type: RobotType::Other,
         urdf_path: "robots/unitree_a1/urdf/a1.urdf".to_string(),
         mesh_dir: "assets/robots/unitree_a1/urdf/".to_string(),
         rapier_options: RapierOption {
             interaction_groups: None,
-            translation_shift: Some(Vec3::new(0.0, 5.0, 0.0)),
-            create_colliders_from_visual_shapes: true,
-            create_colliders_from_collision_shapes: false,
+            translation_shift: Some(Vec3::new(0.0, 4.0, 0.0)),
+            create_colliders_from_visual_shapes: false,
+            create_colliders_from_collision_shapes: true,
+            make_roots_fixed: false,
         },
         marker: None,
-        drone_descriptor: None,
+        uav_descriptor: None,
         uuv_descriptor: None,
     });
-}
-
-fn camera_angle_input(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut ew_rotate: EventWriter<RotateCamera>,
-) {
-    let mut delta_yaw = 0.0;
-    let mut delta_pitch = 0.0;
-    let step = 0.05;
-    if keyboard_input.pressed(KeyCode::ArrowLeft) {
-        delta_yaw += step;
-    }
-    if keyboard_input.pressed(KeyCode::ArrowRight) {
-        delta_yaw -= step;
-    }
-    if keyboard_input.pressed(KeyCode::ArrowUp) {
-        delta_pitch += step;
-    }
-    if keyboard_input.pressed(KeyCode::ArrowDown) {
-        delta_pitch -= step;
-    }
-    if delta_yaw != 0.0 || delta_pitch != 0.0 {
-        ew_rotate.send(RotateCamera {
-            delta_yaw,
-            delta_pitch,
-        });
-    }
 }
