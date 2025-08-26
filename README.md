@@ -107,6 +107,8 @@ SensorsRead {
 
 ```bash
 cargo run --example uav --release
+cargo run --example uuv --release
 cargo run --example quadruped --release
 cargo run --example manipulator --release
+
 ```
