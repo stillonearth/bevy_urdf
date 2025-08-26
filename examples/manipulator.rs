@@ -118,7 +118,7 @@ fn control_motors(
     mut ew_control_motors: EventWriter<ControlMotorPositions>,
 ) {
     if let Some(handle) = robot_handle.0.clone() {
-        let mut rng = rand::rng();
+        // let rng = rand::rng();
         let mut positions: Vec<f32> = Vec::new();
         let mut motor_props: Vec<MotorProps> = Vec::new();
 

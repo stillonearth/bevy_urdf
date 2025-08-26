@@ -7,7 +7,6 @@ pub struct LinkTransform {
 }
 
 use nalgebra::{Point3, Quaternion, UnitQuaternion, Vector3};
-use urdf_rs::Vec3;
 
 // reinit_vector3 and reinit_quaternion reinitialize nalgebra types because k and urdf use different versions of nalgebra
 pub fn reinit_vector3<T: Copy>(old_vec: &impl AsRef<[T; 3]>) -> Vector3<T> {

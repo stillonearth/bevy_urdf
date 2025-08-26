@@ -57,28 +57,40 @@ pub(crate) fn handle_control_motor_velocities(
 
         let mut actuator_index = 0;
 
-        // Process each joint
-        for joint_link_handle in &urdf_robot.rapier_handles.joints {
-            let Some(joint_handle) = joint_link_handle.joint else {
-                continue;
-            };
+        for (mut rapier_context_joints, _rapier_rigid_bodies) in q_rapier_joints.iter_mut() {
+            // Process each joint
+            for joint_link_handle in &urdf_robot.rapier_handles.joints {
+                let Some(joint_handle) = joint_link_handle.joint else {
+                    continue;
+                };
 
-            // Process each rapier context
-            for (mut rapier_context_joints, _rapier_rigid_bodies) in q_rapier_joints.iter_mut() {
+                println!("here 4");
+
+                // Process each rapier context
+
                 let Some((multibody, index)) =
                     rapier_context_joints.multibody_joints.get_mut(joint_handle)
                 else {
                     continue;
                 };
 
+                println!("here 5");
+
                 let Some(link) = multibody.link_mut(index) else {
                     continue;
                 };
 
+                println!("here 6");
+
                 let joint = &mut link.joint.data;
+
+                println!("{:?}", joint);
+
                 let Some(revolute) = joint.as_revolute_mut() else {
                     continue;
                 };
+
+                println!("here 7");
 
                 // Only process if motor exists
                 if revolute.motor().is_none() {
@@ -124,12 +136,12 @@ pub(crate) fn handle_control_motor_positions(
 
         let mut actuator_index = 0;
 
-        for joint_link_handle in &urdf_robot.rapier_handles.joints {
-            let Some(joint_handle) = joint_link_handle.joint else {
-                continue;
-            };
+        for (mut rapier_context_joints, _rapier_rigid_bodies) in q_rapier_joints.iter_mut() {
+            for joint_link_handle in &urdf_robot.rapier_handles.joints {
+                let Some(joint_handle) = joint_link_handle.joint else {
+                    continue;
+                };
 
-            for (mut rapier_context_joints, _rapier_rigid_bodies) in q_rapier_joints.iter_mut() {
                 let Some((multibody, index)) =
                     rapier_context_joints.multibody_joints.get_mut(joint_handle)
                 else {

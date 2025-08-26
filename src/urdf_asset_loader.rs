@@ -59,7 +59,7 @@ impl AssetLoader for RpyAssetLoader {
 
         // Z-up to Y-up.
         let mut isometry: nalgebra::Isometry<f32, nalgebra::Unit<nalgebra::Quaternion<f32>>, 3> =
-            Isometry::rotation(Vector::x() * -std::f32::consts::FRAC_PI_2);
+            Isometry::identity();
 
         if let Some(translaction_shift) = settings.translation_shift {
             isometry.append_translation_mut(&Translation3::new(
@@ -75,7 +75,7 @@ impl AssetLoader for RpyAssetLoader {
             enable_joint_collisions: false,
             apply_imported_mass_props: true,
             make_roots_fixed: settings.make_roots_fixed,
-            // shift: isometry,
+            shift: isometry,
             ..Default::default()
         };
 
@@ -92,9 +92,11 @@ impl AssetLoader for RpyAssetLoader {
             if joint.as_revolute().is_some() {
                 joint.set_motor_velocity(JointAxis::AngX, 0.0, 1.0);
                 robot_joints[index].joint = joint;
+
+                println!("sdsd");
             }
         }
-        urdf_robot.joints = robot_joints;
+        urdf_robot.joints = robot_joints.clone();
 
         // apply custom collision groups
         if let Some(mut adjusted_interaction_groups) = settings.interaction_groups {
@@ -114,11 +116,10 @@ impl AssetLoader for RpyAssetLoader {
         }
 
         // fix joint positions
-        let mut kinematic_isometry = isometry.clone();
-        // kinematic_isometry.rotation = UnitQuaternion::identity();
+        let kinematic_isometry = isometry.clone();
         let kinematic_transforms = get_link_transforms(&mut robot, kinematic_isometry).unwrap();
 
-        let urdf_robot = UrdfRobot::from_robot(
+        let mut urdf_robot = UrdfRobot::from_robot(
             &robot,
             UrdfLoaderOptions {
                 create_colliders_from_visual_shapes: settings.create_colliders_from_visual_shapes,
@@ -127,11 +128,13 @@ impl AssetLoader for RpyAssetLoader {
                 enable_joint_collisions: false,
                 apply_imported_mass_props: true,
                 make_roots_fixed: settings.make_roots_fixed,
-                // shift: Isometry::rotation(-Vector::x() * std::f32::consts::FRAC_PI_2),
+                shift: Isometry::rotation(-Vector::x() * std::f32::consts::FRAC_PI_2),
                 ..Default::default()
             },
             mesh_dir,
         );
+
+        urdf_robot.joints = robot_joints.clone();
 
         Ok(UrdfAsset {
             robot,
