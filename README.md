@@ -5,9 +5,9 @@
 
 A Bevy plugin for importing robots from URDF files and running physics simulations. Ground vehicles use Rapier physics, while drones are simulated using integrated dynamics models.
 
-<img width="500" alt="image" src="https://github.com/user-attachments/assets/bcd6ea71-00e0-4dd6-9f56-761e1c9efe28" />
-<img width="500" alt="image" src="https://github.com/user-attachments/assets/8990a53b-812d-4ca7-8040-af2091294e0c" />
-<img width="500" alt="image" src="https://github.com/user-attachments/assets/f597ce45-f3cd-4cd7-8656-0b47747a07ae" />
+<img width="300" alt="image" src="https://github.com/user-attachments/assets/bcd6ea71-00e0-4dd6-9f56-761e1c9efe28" />
+<img width="300" alt="image" src="https://github.com/user-attachments/assets/8990a53b-812d-4ca7-8040-af2091294e0c" />
+<img width="300" alt="image" src="https://github.com/user-attachments/assets/f597ce45-f3cd-4cd7-8656-0b47747a07ae" />
 
 
 
