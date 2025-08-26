@@ -9,9 +9,6 @@ A Bevy plugin for importing robots from URDF files and running physics simulatio
 <img width="300" alt="image" src="https://github.com/user-attachments/assets/8990a53b-812d-4ca7-8040-af2091294e0c" />
 <img width="300" alt="image" src="https://github.com/user-attachments/assets/f597ce45-f3cd-4cd7-8656-0b47747a07ae" />
 
-
-
-
 ## Features
 
 - Import URDF robot descriptions into Bevy
@@ -114,9 +111,20 @@ For ground-based robots and vehicles:
 
 ```rust
 #[derive(Event)]
-pub struct ControlMotors {
+pub struct ControlMotorVelocities {
     pub handle: Handle<UrdfAsset>,
     pub velocities: Vec<f32>,
+}
+```
+
+#### Motor Control (Manipulators)
+
+```rust
+#[derive(Event)]
+pub struct ControlMotorPositions{
+    pub handle: Handle<UrdfAsset>,
+    pub positions: Vec<f32>,
+    pub motor_props: Vec<MotorProps>,
 }
 ```
 
@@ -159,8 +167,9 @@ pub struct RotateCamera {
 ### Robot Types
 
 - `RobotType::NotDrone` - Ground vehicles, quadrupeds, manipulators
-- `RobotType::Drone` - Aerial vehicles with thrust-based control
-- `RobotType::Uuv` - Underwater vehicles with thruster control
+- `RobotType::UAV` - Aerial vehicles with thrust-based control
+- `RobotType::UUV` - Underwater vehicles with thruster control
+- `RobotType::Manipulator` - Robotic manipulators with fixed root and joint position control
 
 ## Examples
 
@@ -168,13 +177,16 @@ Run the included examples to see the plugin in action:
 
 ```bash
 # Drone simulation
-cargo run --example quadrotor --release
+cargo run --example uav --release
 
 # Quadruped robot simulation
 cargo run --example quadruped --release
 
 # Underwater vehicle simulation
 cargo run --example uuv --release
+
+# Manipulator
+cargo run --example manipulator --release
 ```
 ## URDF Requirements
 
