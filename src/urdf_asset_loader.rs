@@ -92,8 +92,6 @@ impl AssetLoader for RpyAssetLoader {
             if joint.as_revolute().is_some() {
                 joint.set_motor_velocity(JointAxis::AngX, 0.0, 1.0);
                 robot_joints[index].joint = joint;
-
-                println!("sdsd");
             }
         }
         urdf_robot.joints = robot_joints.clone();

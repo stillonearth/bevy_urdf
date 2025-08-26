@@ -64,8 +64,6 @@ pub(crate) fn handle_control_motor_velocities(
                     continue;
                 };
 
-                println!("here 4");
-
                 // Process each rapier context
 
                 let Some((multibody, index)) =
@@ -74,23 +72,15 @@ pub(crate) fn handle_control_motor_velocities(
                     continue;
                 };
 
-                println!("here 5");
-
                 let Some(link) = multibody.link_mut(index) else {
                     continue;
                 };
 
-                println!("here 6");
-
                 let joint = &mut link.joint.data;
-
-                println!("{:?}", joint);
 
                 let Some(revolute) = joint.as_revolute_mut() else {
                     continue;
                 };
-
-                println!("here 7");
 
                 // Only process if motor exists
                 if revolute.motor().is_none() {

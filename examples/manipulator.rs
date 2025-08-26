@@ -117,13 +117,42 @@ fn control_motors(
     robot_handle: Res<UrdfRobotHandle>,
     mut ew_control_motors: EventWriter<ControlMotorPositions>,
 ) {
+    // lower="-0.174533" upper="1.74533
+    // lower="-2.74385" upper="2.84121"
+    // lower="-1.65806" upper="1.65806"
+    // lower="-1.69" upper="1.69"
+    // lower="-1.74533" upper="1.74533"
+    // lower="-1.41986" upper="-1.11986"
+
     if let Some(handle) = robot_handle.0.clone() {
-        // let rng = rand::rng();
+        let rng = rand::rng();
         let mut positions: Vec<f32> = Vec::new();
         let mut motor_props: Vec<MotorProps> = Vec::new();
 
-        for _ in 0..50 {
-            positions.push(0.0); // rng.random_range(0.0..5.0));
+        for i in 0..50 {
+            let mut value = 1.0;
+            // let i = i+1;
+            if i == 0 {
+                value = 0.0;
+                //(-0.174533 + 1.74533) / 2.0;
+            }
+            if i == 1 {
+                value = (-2.74385 + 2.84121) / 2.0;
+            }
+            if i == 2 {
+                value = (-1.65806 + 1.65806) / 2.0;
+            }
+            if i == 3 {
+                value = (-1.69 + 1.69) / 2.0;
+            }
+            if i == 4 {
+                value = (-1.74533 + 1.74533) / 2.0;
+            }
+            if i == 5 {
+                value = 3.14; // (-1.41986 - 1.11986) / 2.0 + 1.0;
+            }
+
+            positions.push(value); // rng.random_range(0.0..5.0));
             motor_props.push(MotorProps {
                 stiffness: 17.8,
                 damping: 0.6,
