@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
+use serde::Deserialize;
 
 use crate::{plugin::URDFRobot, urdf_asset_loader::UrdfAsset};
 
@@ -28,7 +29,7 @@ pub struct ControlMotorVelocities {
     pub velocities: Vec<f32>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Reflect, Deserialize)]
 pub struct MotorProps {
     pub stiffness: f32,
     pub damping: f32,
@@ -171,7 +172,15 @@ pub(crate) fn handle_control_motor_positions(
 
                 if actuator_index >= event.positions.len() {
                     panic!(
-                        "Not enough control parameters provided. Required: {}, Available: {}",
+                        "Not enough positions parameters provided. Required: {}, Available: {}",
+                        actuator_index + 1,
+                        event.positions.len()
+                    );
+                }
+
+                if actuator_index >= event.motor_props.len() {
+                    panic!(
+                        "Not enough motor_props parameters provided. Required: {}, Available: {}",
                         actuator_index + 1,
                         event.positions.len()
                     );
@@ -179,6 +188,7 @@ pub(crate) fn handle_control_motor_positions(
 
                 let target_position = event.positions[actuator_index];
                 let motor_props = event.motor_props[actuator_index];
+
                 joint.set_motor_position(
                     JointAxis::AngX,
                     target_position,

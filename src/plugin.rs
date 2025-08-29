@@ -39,13 +39,13 @@ use crate::{
     urdf_asset_loader::{self, UrdfAsset},
     uuv::{handle_control_fins, handle_control_thrusters, simulate_uuv},
 };
-pub struct UrdfPlugin<PhysicsHooks = ()> {
+pub struct URDFPlugin<PhysicsHooks = ()> {
     default_system_setup: bool,
     schedule: Interned<dyn ScheduleLabel>,
     _phantom: PhantomData<PhysicsHooks>,
 }
 
-impl<PhysicsHooks> UrdfPlugin<PhysicsHooks>
+impl<PhysicsHooks> URDFPlugin<PhysicsHooks>
 where
     PhysicsHooks: 'static + BevyPhysicsHooks,
     for<'w, 's> SystemParamItem<'w, 's, PhysicsHooks>: BevyPhysicsHooks,
@@ -88,7 +88,7 @@ where
     }
 }
 
-impl<PhysicsHooksSystemParam> Default for UrdfPlugin<PhysicsHooksSystemParam> {
+impl<PhysicsHooksSystemParam> Default for URDFPlugin<PhysicsHooksSystemParam> {
     fn default() -> Self {
         Self {
             schedule: PostUpdate.intern(),
@@ -98,7 +98,7 @@ impl<PhysicsHooksSystemParam> Default for UrdfPlugin<PhysicsHooksSystemParam> {
     }
 }
 
-impl Plugin for UrdfPlugin {
+impl Plugin for URDFPlugin {
     fn build(&self, app: &mut App) {
         app.init_asset_loader::<urdf_asset_loader::RpyAssetLoader>()
             .add_event::<ControlMotorVelocities>()
@@ -115,17 +115,18 @@ impl Plugin for UrdfPlugin {
             .add_event::<UUVStateUpdate>()
             .add_event::<SpawnRobot>()
             .add_event::<WaitRobotLoaded>()
+            .insert_resource(URDFPluginSettings { ..default() })
             .init_asset::<urdf_asset_loader::UrdfAsset>();
 
         if self.default_system_setup {
             app.add_systems(
                 self.schedule,
                 (
-                    UrdfPlugin::<NoUserData>::get_systems(PhysicsSet::SyncBackend)
+                    URDFPlugin::<NoUserData>::get_systems(PhysicsSet::SyncBackend)
                         .in_set(PhysicsSet::SyncBackend),
-                    UrdfPlugin::<NoUserData>::get_systems(PhysicsSet::StepSimulation)
+                    URDFPlugin::<NoUserData>::get_systems(PhysicsSet::StepSimulation)
                         .in_set(PhysicsSet::StepSimulation),
-                    UrdfPlugin::<NoUserData>::get_systems(PhysicsSet::Writeback)
+                    URDFPlugin::<NoUserData>::get_systems(PhysicsSet::Writeback)
                         .in_set(PhysicsSet::Writeback),
                 ),
             );
@@ -146,6 +147,11 @@ pub enum RobotType {
     UUV,
     Other,
     Manipulator,
+}
+
+#[derive(Default, Resource)]
+pub struct URDFPluginSettings {
+    pub adjust_mean_position: bool,
 }
 
 impl FromStr for RobotType {
@@ -318,7 +324,12 @@ fn adjust_urdf_robot_mean_position(
         (Entity, &mut Transform, &URDFRobot),
         Without<URDFRobotRigidBodyHandle>,
     >,
+    urdf_plugin_settings: Res<URDFPluginSettings>,
 ) {
+    if !urdf_plugin_settings.adjust_mean_position {
+        return;
+    }
+
     let mut robot_parts: HashMap<Handle<UrdfAsset>, Vec<Transform>> = HashMap::new();
 
     // Collect all transforms for each robot
