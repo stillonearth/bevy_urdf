@@ -1,6 +1,6 @@
 [package]
 name = "bevy_urdf"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Import robots from URDF files and run simulation with rapier."
@@ -9,7 +9,10 @@ repository = "https://github.com/stillonearth/bevy_urdf"
 
 [dependencies]
 anyhow = "1.0"
-bevy = { version = "0.16", default-features = false, features = ["bevy_asset", "png"] }
+bevy = { version = "0.16", default-features = false, features = [
+    "bevy_asset",
+    "png",
+] }
 rapier3d-urdf = { version = "0.6.0", features = ["stl", "wavefront"] }
 rapier3d = { version = "0.25", features = ["serde-serialize"] }
 bevy_rapier3d = { version = "0.30", features = [
@@ -52,4 +55,4 @@ actix-web = "4.4"
 tokio = { version = "1.0", features = ["full"] }
 env_logger = "0.10"
 bevy_infinite_grid = { git = "https://github.com/ForesightMiningSoftwareCorporation/bevy_infinite_grid", branch = "main" }
-bevy_panorbit_camera = {version = "0.27", features = ["bevy_egui"] }
+bevy_panorbit_camera = { version = "0.27", features = ["bevy_egui"] }

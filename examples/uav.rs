@@ -12,8 +12,8 @@ use bevy_stl::StlPlugin;
 use bevy_urdf::RobotType;
 use nalgebra::{UnitQuaternion, Vector3};
 
-use bevy_urdf::drones::{ControlThrusts, UAVDescriptor};
 use bevy_urdf::plugin::UrdfPlugin;
+use bevy_urdf::uav::{ControlThrusts, UAVDescriptor};
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
 use bevy_urdf::{LoadRobot, RapierOption, RobotLoaded, SpawnRobot};
 

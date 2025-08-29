@@ -8,14 +8,14 @@ use rapier3d_urdf::{UrdfMultibodyOptions, UrdfRobot, UrdfRobotHandles};
 use uav::dynamics::RotorState;
 
 use crate::{
-    drones::{
-        try_extract_drone_aerodynamic_props, try_extract_drone_visual_and_dynamic_model_props,
-        DroneRotor, UAVDescriptor,
-    },
     kinematics::LinkTransform,
     plugin::{
         extract_robot_geometry, rapier_to_bevy_rotation, ExtractedGeometry, URDFRobot,
         URDFRobotRigidBodyHandle,
+    },
+    uav::{
+        try_extract_drone_aerodynamic_props, try_extract_drone_visual_and_dynamic_model_props,
+        DroneRotor, UAVDescriptor,
     },
     urdf_asset_loader::{RpyAssetLoaderSettings, UrdfAsset},
     uuv::{try_extract_uuv_thruster_positions, UUVDescriptor},

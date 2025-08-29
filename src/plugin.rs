@@ -28,13 +28,13 @@ use crate::{
         ControlMotorPositions, ControlMotorVelocities, ControlThrusters, SensorsRead,
         UAVStateUpdate, UUVStateUpdate,
     },
-    drones::{
-        handle_control_thrusts, render_drone_rotors, simulate_drone, switch_drone_physics,
-        ControlThrusts,
-    },
     spawn::{
         handle_despawn_robot, handle_load_robot, handle_spawn_robot, handle_wait_robot_loaded,
         DespawnRobot, LoadRobot, RobotLoaded, RobotSpawned, SpawnRobot, WaitRobotLoaded,
+    },
+    uav::{
+        handle_control_thrusts, render_drone_rotors, simulate_drone, switch_drone_physics,
+        ControlThrusts,
     },
     urdf_asset_loader::{self, UrdfAsset},
     uuv::{handle_control_fins, handle_control_thrusters, simulate_uuv},
@@ -77,9 +77,9 @@ where
             )
                 .into_configs(),
             PhysicsSet::Writeback => ((
-                sync_robot_geometry,
                 render_drone_rotors,
-                // adjust_urdf_robot_mean_position,
+                sync_robot_geometry,
+                adjust_urdf_robot_mean_position,
             )
                 .chain())
             .in_set(PhysicsSet::Writeback)
@@ -323,15 +323,18 @@ fn adjust_urdf_robot_mean_position(
 
     // Collect all transforms for each robot
     for (_, _, transform, child_of) in q_rapier_robot_bodies.iter() {
-        let urdf_robot_result = q_urdf_robots
+        let parent_urdf_handle = q_urdf_robots
             .get(child_of.parent())
             .map(|(_, _, urdf)| urdf.handle.clone());
-        if let Ok(handle) = urdf_robot_result {
-            robot_parts.entry(handle).or_default().push(*transform);
+        if let Ok(parent_urdf_handle) = parent_urdf_handle {
+            robot_parts
+                .entry(parent_urdf_handle)
+                .or_default()
+                .push(*transform);
         }
     }
 
-    let quat_fix = Quat::from_rotation_z(std::f32::consts::PI);
+    let quat_fix = Quat::IDENTITY;
     let mut mean_translations: HashMap<Handle<UrdfAsset>, Vec3> = HashMap::new();
 
     // Calculate mean translation for each URDF asset
