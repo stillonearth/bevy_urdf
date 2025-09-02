@@ -10,7 +10,7 @@ use bevy_stl::StlPlugin;
 
 use bevy_urdf::control::{ControlMotorVelocities, SensorsRead};
 use bevy_urdf::plugin::RobotType;
-use bevy_urdf::plugin::UrdfPlugin;
+use bevy_urdf::plugin::URDFPlugin;
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
 use bevy_urdf::{DespawnRobot, LoadRobot, RapierOption, RobotLoaded, SpawnRobot};
 
@@ -24,7 +24,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            UrdfPlugin::default(),
+            URDFPlugin::default(),
             StlPlugin,
             FlyCameraPlugin {
                 spawn_camera: true,

@@ -10,10 +10,9 @@ use bevy_stl::StlPlugin;
 use bevy_urdf::control::ControlMotorPositions;
 use bevy_urdf::control::MotorProps;
 use bevy_urdf::plugin::RobotType;
-use bevy_urdf::plugin::UrdfPlugin;
 use bevy_urdf::spawn::{LoadRobot, RapierOption, RobotLoaded, SpawnRobot};
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
-use rand::Rng;
+use bevy_urdf::URDFPlugin;
 
 #[derive(Resource)]
 struct UrdfRobotHandle(Option<Handle<UrdfAsset>>);
@@ -22,7 +21,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            UrdfPlugin::default(),
+            URDFPlugin::default(),
             StlPlugin,
             PanOrbitCameraPlugin,
             RapierPhysicsPlugin::<NoUserData>::default(),
@@ -127,7 +126,6 @@ fn control_motors(
     // lower="-1.41986" upper="-1.11986"
 
     if let Some(handle) = robot_handle.0.clone() {
-        let rng = rand::rng();
         let mut positions: Vec<f32> = Vec::new();
         let mut motor_props: Vec<MotorProps> = Vec::new();
 
@@ -136,7 +134,6 @@ fn control_motors(
             // let i = i+1;
             if i == 0 {
                 value = 0.0;
-                //(-0.174533 + 1.74533) / 2.0;
             }
             if i == 1 {
                 value = (-2.74385 + 2.84121) / 2.0;

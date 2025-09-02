@@ -38,7 +38,7 @@ k = "0.32"
 fast_ode = { path = "patches/fast_ode-1.0.0" }
 
 [dev-dependencies]
-bevy = { version = "0.16", default-features = false, features = [
+bevy = { version = "0.16.1", default-features = false, features = [
     "bevy_asset",
     "bevy_core_pipeline",
     "bevy_pbr",

@@ -77,8 +77,8 @@ where
             )
                 .into_configs(),
             PhysicsSet::Writeback => ((
-                render_drone_rotors,
                 sync_robot_geometry,
+                render_drone_rotors,
                 adjust_urdf_robot_mean_position,
             )
                 .chain())

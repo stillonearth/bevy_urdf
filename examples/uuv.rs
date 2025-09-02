@@ -10,7 +10,7 @@ use bevy_obj::ObjPlugin;
 use bevy_rapier3d::prelude::*;
 use bevy_stl::StlPlugin;
 use bevy_urdf::control::ControlThrusters;
-use bevy_urdf::plugin::{RobotType, UrdfPlugin};
+use bevy_urdf::plugin::{RobotType, URDFPlugin};
 use bevy_urdf::urdf_asset_loader::UrdfAsset;
 use bevy_urdf::{LoadRobot, RapierOption, RobotLoaded, SpawnRobot};
 
@@ -25,7 +25,7 @@ fn main() {
                 grab_cursor_on_startup: true,
             },
             RapierPhysicsPlugin::<NoUserData>::default(),
-            UrdfPlugin::default().with_default_system_setup(true),
+            URDFPlugin::default().with_default_system_setup(true),
             EguiPlugin {
                 enable_multipass_for_primary_context: true,
             },
