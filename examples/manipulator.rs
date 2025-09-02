@@ -1,3 +1,4 @@
+use bevy::ecs::system::ScheduleSystem;
 use bevy::{
     color::palettes::css::WHITE, input::common_conditions::input_toggle_active, prelude::*,
 };
@@ -21,7 +22,10 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            URDFPlugin::default(),
+            URDFPlugin {
+                default_system_setup: false,
+                ..default()
+            },
             StlPlugin,
             PanOrbitCameraPlugin,
             RapierPhysicsPlugin::<NoUserData>::default(),
@@ -34,6 +38,17 @@ fn main() {
         .init_state::<AppState>()
         .insert_resource(ClearColor(Color::linear_rgb(1.0, 1.0, 1.0)))
         .insert_resource(UrdfRobotHandle(None))
+        .add_systems(
+            Update,
+            (
+                URDFPlugin::<NoUserData>::get_systems(PhysicsSet::SyncBackend)
+                    .in_set(PhysicsSet::SyncBackend),
+                URDFPlugin::<NoUserData>::get_systems(PhysicsSet::StepSimulation)
+                    .in_set(PhysicsSet::StepSimulation),
+                URDFPlugin::<NoUserData>::get_systems(PhysicsSet::Writeback)
+                    .in_set(PhysicsSet::Writeback),
+            ),
+        )
         .add_systems(Startup, setup)
         .add_systems(Update, start_simulation.run_if(in_state(AppState::Loading)))
         .add_systems(Update, (control_motors,))

@@ -40,9 +40,9 @@ use crate::{
     uuv::{handle_control_fins, handle_control_thrusters, simulate_uuv},
 };
 pub struct URDFPlugin<PhysicsHooks = ()> {
-    default_system_setup: bool,
-    schedule: Interned<dyn ScheduleLabel>,
-    _phantom: PhantomData<PhysicsHooks>,
+    pub default_system_setup: bool,
+    pub schedule: Interned<dyn ScheduleLabel>,
+    pub _phantom: PhantomData<PhysicsHooks>,
 }
 
 impl<PhysicsHooks> URDFPlugin<PhysicsHooks>
@@ -76,7 +76,11 @@ where
                 read_sensors,
             )
                 .into_configs(),
-            PhysicsSet::Writeback => ((render_drone_rotors, adjust_urdf_robot_mean_position)
+            PhysicsSet::Writeback => ((
+                render_drone_rotors,
+                sync_robot_geometry,
+                adjust_urdf_robot_mean_position,
+            )
                 .chain())
             .in_set(PhysicsSet::Writeback)
             .into_configs(),
@@ -126,8 +130,6 @@ impl Plugin for URDFPlugin {
                         .in_set(PhysicsSet::Writeback),
                 ),
             );
-
-            app.add_systems(Update, sync_robot_geometry);
         }
     }
 }
