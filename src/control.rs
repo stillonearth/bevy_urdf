@@ -189,11 +189,6 @@ pub(crate) fn handle_control_motor_positions(
                 let target_position = event.positions[actuator_index];
                 let motor_props = event.motor_props[actuator_index];
 
-                println!(
-                    "joint {} set_motor_position -- {:?}",
-                    actuator_index, target_position
-                );
-
                 joint.set_motor_position(
                     JointAxis::AngX,
                     target_position,

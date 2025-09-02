@@ -76,11 +76,7 @@ where
                 read_sensors,
             )
                 .into_configs(),
-            PhysicsSet::Writeback => ((
-                sync_robot_geometry,
-                render_drone_rotors,
-                adjust_urdf_robot_mean_position,
-            )
+            PhysicsSet::Writeback => ((render_drone_rotors, adjust_urdf_robot_mean_position)
                 .chain())
             .in_set(PhysicsSet::Writeback)
             .into_configs(),
@@ -130,6 +126,8 @@ impl Plugin for URDFPlugin {
                         .in_set(PhysicsSet::Writeback),
                 ),
             );
+
+            app.add_systems(Update, sync_robot_geometry);
         }
     }
 }
@@ -285,7 +283,6 @@ fn sync_robot_geometry(
     mut q_rapier_robot_bodies: Query<(Entity, &mut Transform, &mut URDFRobotRigidBodyHandle)>,
     q_rapier_rigid_body_set: Query<(&RapierRigidBodySet,)>,
 ) {
-    // return;
     for rapier_rigid_body_set in q_rapier_rigid_body_set.iter() {
         for (_, mut transform, body_handle) in q_rapier_robot_bodies.iter_mut() {
             if let Some(robot_body) = rapier_rigid_body_set
