@@ -309,8 +309,9 @@ fn sync_robot_geometry(
                     pose_rotation,
                 );
 
-                *transform =
-                    Transform::from_translation(final_translation).with_rotation(final_rotation);
+                *transform = transform
+                    .with_translation(final_translation)
+                    .with_rotation(final_rotation);
             }
         }
     }
