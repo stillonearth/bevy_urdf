@@ -273,9 +273,43 @@ fn update_collider_user_data(
     }
 }
 
+fn get_color(
+    material: &Option<urdf_rs::Material>,
+    robot_materials: &HashMap<String, &urdf_rs::Material>,
+) -> Color {
+    match material {
+        Some(urdf_rs::Material {
+            color: Some(urdf_rs::Color {
+                rgba: urdf_rs::Vec4(rgba),
+            }),
+            ..
+        }) => Color::srgba(
+            rgba[0] as f32,
+            rgba[1] as f32,
+            rgba[2] as f32,
+            rgba[3] as f32,
+        ),
+        Some(urdf_rs::Material { name, .. }) => robot_materials
+            .get(name)
+            .and_then(|material| {
+                material.color.clone().map(|color| {
+                    Color::srgba(
+                        color.rgba.0[0] as f32,
+                        color.rgba.0[1] as f32,
+                        color.rgba.0[2] as f32,
+                        color.rgba.0[3] as f32,
+                    )
+                })
+            })
+            .unwrap_or_else(|| Color::srgb(0.2, 0.8, 0.2)),
+        _ => Color::srgb(0.2, 0.8, 0.2),
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn spawn_robot_geometries(
     children: &mut ChildSpawnerCommands,
+    robot_materials: HashMap<String, &urdf_rs::Material>,
     extracted_geometries: &[ExtractedGeometry],
     kinematic_transforms: &HashMap<String, LinkTransform>,
     body_handles: &[RigidBodyHandle],
@@ -301,13 +335,14 @@ fn spawn_robot_geometries(
             let mesh_3d = create_mesh_from_geometry(geom, &event.mesh_dir, meshes, asset_server);
 
             if let Some(link_transform) = kinematic_transforms.get(&extracted_geometry.link.name) {
-                if let Some(visual_pose) = extracted_geometry.visual_poses.get(geom_index) {
+                if let Some((visual_pose, material)) = extracted_geometry.visuals.get(geom_index) {
                     let (bevy_translation, bevy_rotation) =
                         calculate_transform_from_pose(link_transform, visual_pose);
 
+                    let color = get_color(material, &robot_materials);
                     let mut ec = children.spawn((
                         mesh_3d,
-                        MeshMaterial3d(materials.add(Color::srgb(0.2, 0.8, 0.2))),
+                        MeshMaterial3d(materials.add(color)),
                         URDFRobotRigidBodyHandle {
                             rigid_body_handle: body_handles[index],
                             visual_pose: visual_pose.clone(),
@@ -386,6 +421,12 @@ pub(crate) fn handle_spawn_robot(
             let body_handles: Vec<RigidBodyHandle> =
                 rapier_handles.links.iter().map(|link| link.body).collect();
 
+            let robot_materials = urdf_asset
+                .robot
+                .materials
+                .iter()
+                .map(|material| (material.name.clone(), material))
+                .collect::<HashMap<_, _>>();
             // Extract geometries and get kinematic transforms
             let extracted_geometries = extract_robot_geometry(urdf_asset);
 
@@ -419,6 +460,7 @@ pub(crate) fn handle_spawn_robot(
             .with_children(|children| {
                 spawn_robot_geometries(
                     children,
+                    robot_materials,
                     &extracted_geometries,
                     &urdf_asset.kinematic_transforms,
                     &body_handles,
