@@ -152,20 +152,27 @@ fn create_mesh_from_geometry(
     mesh_dir: &str,
     meshes: &mut ResMut<Assets<Mesh>>,
     asset_server: &Res<AssetServer>,
-) -> Mesh3d {
+) -> (Mesh3d, Option<Vec3>) {
     match geom {
-        urdf_rs::Geometry::Box { size } => Mesh3d(meshes.add(Cuboid::new(
-            size[0] as f32 * 2.0,
-            size[1] as f32 * 2.0,
-            size[2] as f32 * 2.0,
-        ))),
+        urdf_rs::Geometry::Box { size } => (
+            Mesh3d(meshes.add(Cuboid::new(
+                size[0] as f32 * 2.0,
+                size[1] as f32 * 2.0,
+                size[2] as f32 * 2.0,
+            ))),
+            None,
+        ),
         urdf_rs::Geometry::Cylinder { .. } => todo!(),
         urdf_rs::Geometry::Capsule { .. } => todo!(),
-        urdf_rs::Geometry::Sphere { radius } => Mesh3d(meshes.add(Sphere::new(*radius as f32))),
-        urdf_rs::Geometry::Mesh { filename, .. } => {
+        urdf_rs::Geometry::Sphere { radius } => {
+            (Mesh3d(meshes.add(Sphere::new(*radius as f32))), None)
+        }
+        urdf_rs::Geometry::Mesh { filename, scale } => {
             let model_path = Path::new(mesh_dir).join(filename);
             let model_path = model_path.to_str().unwrap();
-            Mesh3d(asset_server.load(model_path))
+            let scale = (*scale)
+                .map(|vec| Vec3::new(vec[0] as f32, vec[1] as f32, vec[2] as f32));
+            (Mesh3d(asset_server.load(model_path)), scale)
         }
     }
 }
@@ -222,7 +229,7 @@ fn setup_drone_rotor(
     index: usize,
     rotor_index: &mut usize,
     bevy_translation: Vec3,
-    bevy_rotation: Quat,
+    transform: Transform,
 ) {
     let adp = drone_descriptor.aerodynamic_props;
     let vbp = &drone_descriptor.visual_body_properties;
@@ -234,9 +241,9 @@ fn setup_drone_rotor(
         let rotor_state = RotorState::new(max_thrust, max_thrust * 2.0, adp.kf, adp.km);
 
         let transform = if let Some(visual_rotor_position) = vbp.rotor_positions.get(*rotor_index) {
-            Transform::from_translation(*visual_rotor_position).with_rotation(bevy_rotation)
+            transform.with_translation(*visual_rotor_position)
         } else {
-            Transform::from_translation(bevy_translation).with_rotation(bevy_rotation)
+            transform.with_translation(bevy_translation)
         };
 
         ec.insert((
@@ -273,9 +280,43 @@ fn update_collider_user_data(
     }
 }
 
+fn get_color(
+    material: &Option<urdf_rs::Material>,
+    robot_materials: &HashMap<String, &urdf_rs::Material>,
+) -> Color {
+    match material {
+        Some(urdf_rs::Material {
+            color: Some(urdf_rs::Color {
+                rgba: urdf_rs::Vec4(rgba),
+            }),
+            ..
+        }) => Color::srgba(
+            rgba[0] as f32,
+            rgba[1] as f32,
+            rgba[2] as f32,
+            rgba[3] as f32,
+        ),
+        Some(urdf_rs::Material { name, .. }) => robot_materials
+            .get(name)
+            .and_then(|material| {
+                material.color.clone().map(|color| {
+                    Color::srgba(
+                        color.rgba.0[0] as f32,
+                        color.rgba.0[1] as f32,
+                        color.rgba.0[2] as f32,
+                        color.rgba.0[3] as f32,
+                    )
+                })
+            })
+            .unwrap_or_else(|| Color::srgb(0.2, 0.8, 0.2)),
+        _ => Color::srgb(0.2, 0.8, 0.2),
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn spawn_robot_geometries(
     children: &mut ChildSpawnerCommands,
+    robot_materials: HashMap<String, &urdf_rs::Material>,
     extracted_geometries: &[ExtractedGeometry],
     kinematic_transforms: &HashMap<String, LinkTransform>,
     body_handles: &[RigidBodyHandle],
@@ -298,16 +339,18 @@ fn spawn_robot_geometries(
         let index = extracted_geometry.index;
 
         for (geom_index, geom) in extracted_geometry.geometries.iter().enumerate() {
-            let mesh_3d = create_mesh_from_geometry(geom, &event.mesh_dir, meshes, asset_server);
+            let (mesh_3d, scale) =
+                create_mesh_from_geometry(geom, &event.mesh_dir, meshes, asset_server);
 
             if let Some(link_transform) = kinematic_transforms.get(&extracted_geometry.link.name) {
-                if let Some(visual_pose) = extracted_geometry.visual_poses.get(geom_index) {
+                if let Some((visual_pose, material)) = extracted_geometry.visuals.get(geom_index) {
                     let (bevy_translation, bevy_rotation) =
                         calculate_transform_from_pose(link_transform, visual_pose);
 
+                    let color = get_color(material, &robot_materials);
                     let mut ec = children.spawn((
                         mesh_3d,
-                        MeshMaterial3d(materials.add(Color::srgb(0.2, 0.8, 0.2))),
+                        MeshMaterial3d(materials.add(color)),
                         URDFRobotRigidBodyHandle {
                             rigid_body_handle: body_handles[index],
                             visual_pose: visual_pose.clone(),
@@ -321,6 +364,10 @@ fn spawn_robot_geometries(
                         )),
                     ));
 
+                    let mut transform = Transform::from_rotation(bevy_rotation);
+                    if let Some(scale) = scale {
+                        transform = transform.with_scale(scale);
+                    }
                     if let Some(ref drone_descriptor) = drone_descriptor {
                         setup_drone_rotor(
                             &mut ec,
@@ -328,11 +375,10 @@ fn spawn_robot_geometries(
                             index,
                             &mut rotor_index,
                             bevy_translation,
-                            bevy_rotation,
+                            transform,
                         );
                     } else {
-                        let transform = Transform::from_translation(bevy_translation)
-                            .with_rotation(bevy_rotation);
+                        let transform = transform.with_translation(bevy_translation);
                         ec.insert(transform);
                     }
 
@@ -386,6 +432,12 @@ pub(crate) fn handle_spawn_robot(
             let body_handles: Vec<RigidBodyHandle> =
                 rapier_handles.links.iter().map(|link| link.body).collect();
 
+            let robot_materials = urdf_asset
+                .robot
+                .materials
+                .iter()
+                .map(|material| (material.name.clone(), material))
+                .collect::<HashMap<_, _>>();
             // Extract geometries and get kinematic transforms
             let extracted_geometries = extract_robot_geometry(urdf_asset);
 
@@ -419,6 +471,7 @@ pub(crate) fn handle_spawn_robot(
             .with_children(|children| {
                 spawn_robot_geometries(
                     children,
+                    robot_materials,
                     &extracted_geometries,
                     &urdf_asset.kinematic_transforms,
                     &body_handles,

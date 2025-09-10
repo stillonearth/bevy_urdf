@@ -192,7 +192,7 @@ pub struct ExtractedGeometry {
     pub index: usize,
     pub geometries: Vec<Geometry>,
     pub inertia_pose: Pose,
-    pub visual_poses: Vec<Pose>,
+    pub visuals: Vec<(Pose, Option<urdf_rs::Material>)>,
     pub colliders: Vec<Collider>,
     pub link: Link,
 }
@@ -211,17 +211,17 @@ pub fn extract_robot_geometry(robot: &UrdfAsset) -> Vec<ExtractedGeometry> {
                 .iter()
                 .map(|visual| visual.geometry.clone())
                 .collect();
-            let visual_poses = link
+            let visuals = link
                 .visual
                 .iter()
-                .map(|visual| visual.origin.clone())
+                .map(|visual| (visual.origin.clone(), visual.material.clone()))
                 .collect();
 
             ExtractedGeometry {
                 index,
                 geometries,
                 inertia_pose: link.inertial.origin.clone(),
-                visual_poses,
+                visuals,
                 link: link.clone(),
                 colliders,
             }
@@ -309,8 +309,9 @@ fn sync_robot_geometry(
                     pose_rotation,
                 );
 
-                *transform =
-                    Transform::from_translation(final_translation).with_rotation(final_rotation);
+                *transform = transform
+                    .with_translation(final_translation)
+                    .with_rotation(final_rotation);
             }
         }
     }
