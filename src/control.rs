@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
+use rapier3d::prelude::*;
+use rapier3d_urdf::UrdfJointHandle;
 use serde::Deserialize;
 
 use crate::{plugin::URDFRobot, urdf_asset_loader::UrdfAsset};
@@ -57,7 +59,7 @@ pub struct ControlFins {
 pub(crate) fn handle_control_motor_velocities(
     mut er_control_motors: EventReader<ControlMotorVelocities>,
     q_urdf_robots: Query<(Entity, &URDFRobot)>,
-    mut q_rapier_joints: Query<(&mut RapierContextJoints, &RapierRigidBodySet)>,
+    mut q_rapier_joints: Query<(&mut RapierContextJoints, &mut RapierRigidBodySet)>,
 ) {
     for event in er_control_motors.read() {
         // Early exit conditions
@@ -76,7 +78,7 @@ pub(crate) fn handle_control_motor_velocities(
 
         let mut actuator_index = 0;
 
-        for (mut rapier_context_joints, _rapier_rigid_bodies) in q_rapier_joints.iter_mut() {
+        for (mut rapier_context_joints, mut rapier_rigid_bodies) in q_rapier_joints.iter_mut() {
             // Process each joint
             for joint_link_handle in &urdf_robot.rapier_handles.joints {
                 let Some(joint_handle) = joint_link_handle.joint else {
@@ -106,6 +108,8 @@ pub(crate) fn handle_control_motor_velocities(
                     continue;
                 }
 
+                wakeup_links(&mut rapier_rigid_bodies, joint_link_handle);
+
                 // Validate we have enough velocities
                 if actuator_index >= event.velocities.len() {
                     panic!(
@@ -126,7 +130,7 @@ pub(crate) fn handle_control_motor_velocities(
 pub(crate) fn handle_control_motor_positions(
     mut er_control_motors: EventReader<ControlMotorPositions>,
     q_urdf_robots: Query<(Entity, &URDFRobot)>,
-    mut q_rapier_joints: Query<(&mut RapierContextJoints, &RapierRigidBodySet)>,
+    mut q_rapier_joints: Query<(&mut RapierContextJoints, &mut RapierRigidBodySet)>,
 ) {
     for event in er_control_motors.read() {
         // Early exit conditions
@@ -145,7 +149,7 @@ pub(crate) fn handle_control_motor_positions(
 
         let mut actuator_index = 0;
 
-        for (mut rapier_context_joints, _rapier_rigid_bodies) in q_rapier_joints.iter_mut() {
+        for (mut rapier_context_joints, mut rapier_rigid_bodies) in q_rapier_joints.iter_mut() {
             for joint_link_handle in &urdf_robot.rapier_handles.joints {
                 let Some(joint_handle) = joint_link_handle.joint else {
                     continue;
@@ -169,6 +173,8 @@ pub(crate) fn handle_control_motor_positions(
                 if revolute.motor().is_none() {
                     continue;
                 }
+
+                wakeup_links(&mut rapier_rigid_bodies, joint_link_handle);
 
                 if actuator_index >= event.positions.len() {
                     panic!(
@@ -197,6 +203,20 @@ pub(crate) fn handle_control_motor_positions(
                 );
                 actuator_index += 1;
             }
+        }
+    }
+}
+
+fn wakeup_links(
+    rapier_rigid_bodies: &mut Mut<RapierRigidBodySet>,
+    joint_link_handle: &UrdfJointHandle<Option<MultibodyJointHandle>>,
+) {
+    for link in [joint_link_handle.link1, joint_link_handle.link2] {
+        let Some(body) = rapier_rigid_bodies.bodies.get_mut(link) else {
+            continue;
+        };
+        if body.is_sleeping() {
+            body.wake_up(true)
         }
     }
 }
