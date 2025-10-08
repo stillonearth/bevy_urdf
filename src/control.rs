@@ -1,31 +1,31 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use rapier3d::prelude::*;
+use rapier3d::prelude::MultibodyJointHandle;
 use rapier3d_urdf::UrdfJointHandle;
 use serde::Deserialize;
 
 use crate::{plugin::URDFRobot, urdf_asset_loader::UrdfAsset};
 
-#[derive(Event)]
+#[derive(Message)]
 pub struct SensorsRead {
     pub handle: Handle<UrdfAsset>,
     pub transforms: Vec<Transform>,
     pub joint_angles: Vec<f32>,
 }
 
-#[derive(Event)]
+#[derive(Message)]
 pub struct UAVStateUpdate {
     pub handle: Handle<UrdfAsset>,
     pub drone_state: uav::dynamics::State,
 }
 
-#[derive(Event)]
+#[derive(Message)]
 pub struct UUVStateUpdate {
     pub handle: Handle<UrdfAsset>,
     pub uuv_state: crate::uuv::UuvState,
 }
 
-#[derive(Event)]
+#[derive(Message)]
 pub struct ControlMotorVelocities {
     pub handle: Handle<UrdfAsset>,
     pub velocities: Vec<f32>,
@@ -37,27 +37,27 @@ pub struct MotorProps {
     pub damping: f32,
 }
 
-#[derive(Event)]
+#[derive(Message)]
 pub struct ControlMotorPositions {
     pub handle: Handle<UrdfAsset>,
     pub positions: Vec<f32>,
     pub motor_props: Vec<MotorProps>,
 }
 
-#[derive(Event)]
+#[derive(Message)]
 pub struct ControlThrusters {
     pub handle: Handle<UrdfAsset>,
     pub thrusts: Vec<f32>,
 }
 
-#[derive(Event)]
+#[derive(Message)]
 pub struct ControlFins {
     pub handle: Handle<UrdfAsset>,
     pub angles: Vec<f32>,
 }
 
 pub(crate) fn handle_control_motor_velocities(
-    mut er_control_motors: EventReader<ControlMotorVelocities>,
+    mut er_control_motors: MessageReader<ControlMotorVelocities>,
     q_urdf_robots: Query<(Entity, &URDFRobot)>,
     mut q_rapier_joints: Query<(&mut RapierContextJoints, &mut RapierRigidBodySet)>,
 ) {
@@ -120,7 +120,7 @@ pub(crate) fn handle_control_motor_velocities(
                 }
 
                 let target_velocity = event.velocities[actuator_index];
-                joint.set_motor_velocity(JointAxis::AngX, target_velocity, 1.0);
+                joint.set_motor_velocity(rapier3d::prelude::JointAxis::AngX, target_velocity, 1.0);
                 actuator_index += 1;
             }
         }
@@ -128,7 +128,7 @@ pub(crate) fn handle_control_motor_velocities(
 }
 
 pub(crate) fn handle_control_motor_positions(
-    mut er_control_motors: EventReader<ControlMotorPositions>,
+    mut er_control_motors: MessageReader<ControlMotorPositions>,
     q_urdf_robots: Query<(Entity, &URDFRobot)>,
     mut q_rapier_joints: Query<(&mut RapierContextJoints, &mut RapierRigidBodySet)>,
 ) {

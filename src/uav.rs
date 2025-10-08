@@ -99,7 +99,7 @@ pub struct VisualBodyProps {
     pub rotor_positions: Vec<Vec3>,
 }
 
-#[derive(Event)]
+#[derive(Message)]
 pub struct ControlThrusts {
     pub handle: Handle<UrdfAsset>,
     pub thrusts: Vec<f32>,
@@ -247,7 +247,7 @@ pub fn try_extract_drone_visual_and_dynamic_model_props(
 }
 
 pub(crate) fn handle_control_thrusts(
-    mut er_control_thrusts: EventReader<ControlThrusts>,
+    mut er_control_thrusts: MessageReader<ControlThrusts>,
     mut q_urdf_robots: Query<(Entity, &URDFRobot, &mut UAVDescriptor)>,
 ) {
     // just copy thrusts to drone descriptor. uav will pick it and apply in dynamics model
@@ -312,7 +312,7 @@ pub(crate) fn simulate_drone(
         &mut RapierContextColliders,
         &mut RapierContextJoints,
     )>,
-    mut ew_uav_state_update: EventWriter<UAVStateUpdate>,
+    mut ew_uav_state_update: MessageWriter<UAVStateUpdate>,
 ) {
     for (_, rapier_configuration, rapier_simulation, mut rigid_bodies, _, _) in
         q_rapier_context.iter_mut()

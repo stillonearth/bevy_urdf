@@ -1,5 +1,6 @@
 use std::{collections::HashMap, path::Path};
 
+use bevy::mesh::*;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use nalgebra::UnitQuaternion;
@@ -25,7 +26,7 @@ use crate::{
 #[derive(Component)]
 pub struct Rotor {}
 
-#[derive(Clone, Event)]
+#[derive(Clone, Event, Message)]
 pub struct SpawnRobot {
     pub handle: Handle<UrdfAsset>,
     pub mesh_dir: String,
@@ -35,17 +36,17 @@ pub struct SpawnRobot {
     pub uuv_descriptor: Option<UUVDescriptor>,
 }
 
-#[derive(Clone, Event)]
+#[derive(Clone, Event, Message)]
 pub struct DespawnRobot {
     pub handle: Handle<UrdfAsset>,
 }
 
-#[derive(Clone, Event)]
+#[derive(Clone, Event, Message)]
 pub struct RobotSpawned {
     pub handle: Handle<UrdfAsset>,
 }
 
-#[derive(Clone, Event)]
+#[derive(Clone, Event, Message)]
 pub struct WaitRobotLoaded {
     pub handle: Handle<UrdfAsset>,
     pub mesh_dir: String,
@@ -55,7 +56,7 @@ pub struct WaitRobotLoaded {
     pub uuv_descriptor: Option<UUVDescriptor>,
 }
 
-#[derive(Clone, Event)]
+#[derive(Clone, Event, Message)]
 pub struct RobotLoaded {
     pub handle: Handle<UrdfAsset>,
     pub mesh_dir: String,
@@ -74,7 +75,7 @@ pub struct RapierOption {
     pub make_roots_fixed: bool,
 }
 
-#[derive(Clone, Event)]
+#[derive(Clone, Message)]
 pub struct LoadRobot {
     pub robot_type: RobotType,
     pub urdf_path: String,
@@ -169,9 +170,8 @@ fn create_mesh_from_geometry(
         }
         urdf_rs::Geometry::Mesh { filename, scale } => {
             let model_path = Path::new(mesh_dir).join(filename);
-            let model_path = model_path.to_str().unwrap();
-            let scale = (*scale)
-                .map(|vec| Vec3::new(vec[0] as f32, vec[1] as f32, vec[2] as f32));
+            let model_path = model_path.to_str().unwrap().to_string();
+            let scale = (*scale).map(|vec| Vec3::new(vec[0] as f32, vec[1] as f32, vec[2] as f32));
             (Mesh3d(asset_server.load(model_path)), scale)
         }
     }
@@ -404,9 +404,9 @@ pub(crate) fn handle_spawn_robot(
         &mut RapierContextJoints,
     )>,
     q_rapier_context_simulation: Query<(Entity, &RapierContextSimulation)>,
-    mut er_spawn_robot: EventReader<SpawnRobot>,
-    mut ew_wait_robot_loaded: EventWriter<WaitRobotLoaded>,
-    mut ew_robot_spawned: EventWriter<RobotSpawned>,
+    mut er_spawn_robot: MessageReader<SpawnRobot>,
+    mut ew_wait_robot_loaded: MessageWriter<WaitRobotLoaded>,
+    mut ew_robot_spawned: MessageWriter<RobotSpawned>,
 ) {
     for event in er_spawn_robot.read() {
         let rapier_context_simulation_entity = q_rapier_context_simulation.iter().next().unwrap().0;
@@ -511,7 +511,7 @@ pub(crate) fn handle_despawn_robot(
         &mut RapierContextJoints,
     )>,
     q_urdf_robots: Query<(Entity, &URDFRobot)>,
-    mut er_despawn_robot: EventReader<DespawnRobot>,
+    mut er_despawn_robot: MessageReader<DespawnRobot>,
 ) {
     for event in er_despawn_robot.read() {
         let robot_handle = event.handle.clone();
@@ -552,8 +552,8 @@ pub(crate) fn handle_despawn_robot(
 
 pub(crate) fn handle_load_robot(
     asset_server: Res<AssetServer>,
-    mut er_load_robot: EventReader<LoadRobot>,
-    mut ew_robot_loaded: EventWriter<RobotLoaded>,
+    mut er_load_robot: MessageReader<LoadRobot>,
+    mut ew_robot_loaded: MessageWriter<RobotLoaded>,
 ) {
     for event in er_load_robot.read() {
         let interaction_groups: Option<InteractionGroups> = event.rapier_options.interaction_groups;
@@ -588,8 +588,8 @@ pub(crate) fn handle_load_robot(
 }
 
 pub(crate) fn handle_wait_robot_loaded(
-    mut er_wait_robot_loaded: EventReader<WaitRobotLoaded>,
-    mut ew_spawn_robot: EventWriter<SpawnRobot>,
+    mut er_wait_robot_loaded: MessageReader<WaitRobotLoaded>,
+    mut ew_spawn_robot: MessageWriter<SpawnRobot>,
 ) {
     for event in er_wait_robot_loaded.read() {
         ew_spawn_robot.write(SpawnRobot {

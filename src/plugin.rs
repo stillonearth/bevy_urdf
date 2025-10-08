@@ -101,20 +101,20 @@ impl<PhysicsHooksSystemParam> Default for URDFPlugin<PhysicsHooksSystemParam> {
 impl Plugin for URDFPlugin {
     fn build(&self, app: &mut App) {
         app.init_asset_loader::<urdf_asset_loader::RpyAssetLoader>()
-            .add_event::<ControlMotorVelocities>()
-            .add_event::<ControlMotorPositions>()
-            .add_event::<ControlThrusts>()
-            .add_event::<ControlThrusters>()
-            .add_event::<ControlFins>()
-            .add_event::<DespawnRobot>()
-            .add_event::<LoadRobot>()
-            .add_event::<RobotLoaded>()
-            .add_event::<RobotSpawned>()
-            .add_event::<SensorsRead>()
-            .add_event::<UAVStateUpdate>()
-            .add_event::<UUVStateUpdate>()
-            .add_event::<SpawnRobot>()
-            .add_event::<WaitRobotLoaded>()
+            .add_message::<ControlMotorVelocities>()
+            .add_message::<ControlMotorPositions>()
+            .add_message::<ControlThrusts>()
+            .add_message::<ControlThrusters>()
+            .add_message::<ControlFins>()
+            .add_message::<DespawnRobot>()
+            .add_message::<LoadRobot>()
+            .add_message::<RobotLoaded>()
+            .add_message::<RobotSpawned>()
+            .add_message::<SensorsRead>()
+            .add_message::<UAVStateUpdate>()
+            .add_message::<UUVStateUpdate>()
+            .add_message::<SpawnRobot>()
+            .add_message::<WaitRobotLoaded>()
             .insert_resource(URDFPluginSettings { ..default() })
             .init_asset::<urdf_asset_loader::UrdfAsset>();
 
@@ -387,7 +387,7 @@ fn adjust_urdf_robot_mean_position(
 fn read_sensors(
     q_urdf_robots: Query<(Entity, &URDFRobot)>,
     q_urdf_rigid_bodies: Query<(Entity, &ChildOf, &Transform, &URDFRobotRigidBodyHandle)>,
-    mut ew_sensors_read: EventWriter<SensorsRead>,
+    mut ew_sensors_read: MessageWriter<SensorsRead>,
     q_rapier_joints: Query<(&RapierContextJoints, &RapierRigidBodySet)>,
 ) {
     let mut readings_hashmap: HashMap<Handle<UrdfAsset>, Vec<Transform>> = HashMap::new();

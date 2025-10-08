@@ -9,27 +9,28 @@ repository = "https://github.com/stillonearth/bevy_urdf"
 
 [dependencies]
 anyhow = "1.0"
-bevy = { version = "0.16", default-features = false, features = [
+bevy = { version = "0.17", default-features = false, features = [
     "bevy_asset",
+    "bevy_render",
     "png",
 ] }
-rapier3d-urdf = { version = "0.6.0", features = ["stl", "wavefront"] }
-rapier3d = { version = "0.25", features = ["serde-serialize"] }
-bevy_rapier3d = { version = "0.30", features = [
+rapier3d-urdf = { version = "0.10", features = ["stl", "wavefront"] }
+rapier3d = { version = "0.29", features = ["serde-serialize"] }
+bevy_rapier3d = { git = "https://github.com/lukasfri/bevy_rapier.git", rev="9f45ee4", features = [
     "simd-stable",
     "serde-serialize",
 ] }
-bevy_stl = "0.16"
-bevy_obj = "0.16"
+bevy_stl = { git = "https://github.com/stillonearth/bevy_stl.git", rev = "a75392d" }
+bevy_obj = "0.17"
 urdf-rs = "0.9"
 thiserror = "2.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rand = "0.9"
-nalgebra = "0.33"
+nalgebra = "0.34.1"
 csv = "1.3.1"
 uom = "0.37"
-uav = { version = "0.1.2" }
+uav = { version = "0.2.0" }
 roxmltree = "0.20"
 queues = "1.0.2"
 k = "0.32"
@@ -38,7 +39,7 @@ k = "0.32"
 fast_ode = { path = "patches/fast_ode-1.0.0" }
 
 [dev-dependencies]
-bevy = { version = "0.16.1", default-features = false, features = [
+bevy = { version = "0.17", default-features = false, features = [
     "bevy_asset",
     "bevy_core_pipeline",
     "bevy_pbr",
@@ -48,9 +49,10 @@ bevy = { version = "0.16.1", default-features = false, features = [
     "tonemapping_luts",
     "x11",
     "png",
+    "zstd_rust",
 ] }
 bevy_flycam = { git = "https://github.com/kSDOT/bevy_flycam.git", rev = "a6f36a" }
-bevy-inspector-egui = "0.31"
+bevy-inspector-egui = "0.32"
 actix-web = "4.4"
 tokio = { version = "1.0", features = ["full"] }
 env_logger = "0.10"

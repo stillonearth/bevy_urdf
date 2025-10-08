@@ -88,7 +88,7 @@ pub fn try_extract_uuv_thruster_positions(xml_content: &str) -> Result<Vec<Vec3>
 pub(crate) fn simulate_uuv(
     mut q_uuvs: Query<(&mut Transform, &URDFRobot, &mut UUVDescriptor)>,
     time: Res<Time>,
-    mut ew_state: EventWriter<UUVStateUpdate>,
+    mut ew_state: MessageWriter<UUVStateUpdate>,
 ) {
     for (mut transform, robot, mut descriptor) in q_uuvs.iter_mut() {
         let dt = time.delta_secs();
@@ -129,7 +129,7 @@ pub(crate) fn simulate_uuv(
 }
 
 pub(crate) fn handle_control_thrusters(
-    mut er_thrusters: EventReader<ControlThrusters>,
+    mut er_thrusters: MessageReader<ControlThrusters>,
     mut q_uuvs: Query<(&URDFRobot, &mut UUVDescriptor)>,
 ) {
     for event in er_thrusters.read() {
@@ -143,7 +143,7 @@ pub(crate) fn handle_control_thrusters(
 }
 
 pub(crate) fn handle_control_fins(
-    mut er_fins: EventReader<ControlFins>,
+    mut er_fins: MessageReader<ControlFins>,
     mut q_uuvs: Query<(&URDFRobot, &mut UUVDescriptor)>,
 ) {
     for event in er_fins.read() {
