@@ -2,7 +2,7 @@ use bevy::{
     color::palettes::css::WHITE, input::common_conditions::input_toggle_active, prelude::*,
 };
 use bevy_flycam::prelude::*;
-use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
+// use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
@@ -26,27 +26,22 @@ fn main() {
             DefaultPlugins,
             URDFPlugin::default(),
             StlPlugin,
-            FlyCameraPlugin {
-                spawn_camera: true,
-                grab_cursor_on_startup: true,
-            },
+            PlayerPlugin,
             RapierPhysicsPlugin::<NoUserData>::default(),
-            EguiPlugin {
-                enable_multipass_for_primary_context: true,
-            },
-            InfiniteGridPlugin,
+            EguiPlugin { ..default() },
+            // InfiniteGridPlugin,
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
         ))
         .init_state::<AppState>()
-        .insert_resource(MovementSettings {
-            move_speed: Vec3::ONE * 3.0,
-        })
-        .insert_resource(MouseSettings {
-            invert_horizontal: false,
-            invert_vertical: false,
-            mouse_sensitivity: 0.00012,
-            lock_cursor_to_middle: false,
-        })
+        // .insert_resource(MovementSettings {
+        //     move_speed: Vec3::ONE * 3.0,
+        // })
+        // .insert_resource(MouseSettings {
+        //     invert_horizontal: false,
+        //     invert_vertical: false,
+        //     mouse_sensitivity: 0.00012,
+        //     lock_cursor_to_middle: false,
+        // })
         .insert_resource(ClearColor(Color::linear_rgb(1.0, 1.0, 1.0)))
         .insert_resource(UrdfRobotHandle(None))
         .insert_resource(SimulationStepCounter(0))
@@ -71,8 +66,8 @@ struct SimulationStepCounter(usize);
 
 fn start_simulation(
     mut commands: Commands,
-    mut er_robot_loaded: EventReader<RobotLoaded>,
-    mut ew_spawn_robot: EventWriter<SpawnRobot>,
+    mut er_robot_loaded: MessageReader<RobotLoaded>,
+    mut ew_spawn_robot: MessageWriter<SpawnRobot>,
     mut state: ResMut<NextState<AppState>>,
 ) {
     for event in er_robot_loaded.read() {
@@ -124,10 +119,10 @@ fn check_rapier_state(
 }
 
 fn robot_lifecycle(
-    mut er_sensors_read: EventReader<SensorsRead>,
+    mut er_sensors_read: MessageReader<SensorsRead>,
     mut simulation_step_counter: ResMut<SimulationStepCounter>,
     robot_handle: Res<UrdfRobotHandle>,
-    mut er_despawn_robot: EventWriter<DespawnRobot>,
+    mut er_despawn_robot: MessageWriter<DespawnRobot>,
 ) {
     for event in er_sensors_read.read() {
         println!("Step {}", simulation_step_counter.0);
@@ -162,7 +157,7 @@ fn robot_lifecycle(
 
 fn control_motors(
     robot_handle: Res<UrdfRobotHandle>,
-    mut ew_control_motors: EventWriter<ControlMotorVelocities>,
+    mut ew_control_motors: MessageWriter<ControlMotorVelocities>,
 ) {
     if let Some(handle) = robot_handle.0.clone() {
         let mut rng = rand::rng();
@@ -184,7 +179,7 @@ enum AppState {
 }
 
 #[allow(deprecated)]
-fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
+fn setup(mut commands: Commands, mut ew_load_robot: MessageWriter<LoadRobot>) {
     // Scene
     commands.insert_resource(AmbientLight {
         color: WHITE.into(),
@@ -194,16 +189,16 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
 
     // ground
     commands.spawn((
-        InfiniteGridBundle {
-            transform: Transform::from_xyz(0.0, -1.0, 0.0),
-            ..default()
-        },
+        // InfiniteGridBundle {
+        //     transform: Transform::from_xyz(0.0, -1.0, 0.0),
+        //     ..default()
+        // },
         RigidBody::Fixed,
         Collider::cuboid(900., 0.05, 900.),
     ));
 
     // load robot
-    ew_load_robot.send(LoadRobot {
+    ew_load_robot.write(LoadRobot {
         robot_type: RobotType::Other,
         urdf_path: "robots/unitree_a1/urdf/a1.urdf".to_string(),
         mesh_dir: "assets/robots/unitree_a1/urdf/".to_string(),

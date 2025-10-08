@@ -1,8 +1,8 @@
 use bevy::input::common_conditions::input_toggle_active;
 use bevy::{color::palettes::css::WHITE, prelude::*};
-use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
+// use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 use bevy_inspector_egui::bevy_egui::EguiPlugin;
-use bevy_inspector_egui::bevy_egui::{egui, EguiContextPass, EguiContexts};
+use bevy_inspector_egui::bevy_egui::{egui, EguiContexts};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_panorbit_camera::*;
 use bevy_rapier3d::prelude::*;
@@ -46,10 +46,8 @@ fn main() {
             StlPlugin,
             PanOrbitCameraPlugin,
             RapierPhysicsPlugin::<NoUserData>::default(),
-            EguiPlugin {
-                enable_multipass_for_primary_context: true,
-            },
-            InfiniteGridPlugin,
+            EguiPlugin::default(),
+            // InfiniteGridPlugin,
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
         ))
         .init_state::<AppState>()
@@ -78,14 +76,14 @@ fn main() {
             )
                 .run_if(in_state(AppState::Simulation)),
         )
-        .add_systems(EguiContextPass, motor_ui.before(control_motors))
+        // .add_systems((control_motors, motor_ui).chain())
         .run();
 }
 
 fn start_simulation(
     mut commands: Commands,
-    mut er_robot_loaded: EventReader<RobotLoaded>,
-    mut ew_spawn_robot: EventWriter<SpawnRobot>,
+    mut er_robot_loaded: MessageReader<RobotLoaded>,
+    mut ew_spawn_robot: MessageWriter<SpawnRobot>,
     mut state: ResMut<NextState<AppState>>,
 ) {
     for event in er_robot_loaded.read() {
@@ -110,7 +108,7 @@ enum AppState {
 }
 
 #[allow(deprecated)]
-fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
+fn setup(mut commands: Commands, mut ew_load_robot: MessageWriter<LoadRobot>) {
     // Scene
     commands.insert_resource(AmbientLight {
         color: WHITE.into(),
@@ -120,10 +118,10 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
 
     // ground
     commands.spawn((
-        InfiniteGridBundle {
-            transform: Transform::from_xyz(0.0, -1.0, 0.0),
-            ..default()
-        },
+        // InfiniteGridBundle {
+        //     transform: Transform::from_xyz(0.0, -1.0, 0.0),
+        //     ..default()
+        // },
         RigidBody::Fixed,
         Collider::cuboid(900., 0.05, 900.),
     ));
@@ -142,7 +140,7 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
     ));
 
     // load robot
-    ew_load_robot.send(LoadRobot {
+    ew_load_robot.write(LoadRobot {
         robot_type: RobotType::Manipulator,
         urdf_path: "manipulators/so-101/so101_new_calib.urdf".to_string(),
         mesh_dir: "assets/manipulators/so-101/".to_string(),
@@ -224,7 +222,7 @@ fn motor_ui(mut contexts: EguiContexts, mut motor_angles: ResMut<MotorAngles>) {
         return;
     }
 
-    if let Some(ctx) = contexts.try_ctx_mut() {
+    if let Ok(ctx) = contexts.ctx_mut() {
         let mut angles_changed = false;
 
         egui::Window::new("Motor Control")
@@ -271,7 +269,7 @@ fn motor_ui(mut contexts: EguiContexts, mut motor_angles: ResMut<MotorAngles>) {
 
 fn control_motors(
     robot_handle: Res<UrdfRobotHandle>,
-    mut ew_control_motors: EventWriter<ControlMotorPositions>,
+    mut ew_control_motors: MessageWriter<ControlMotorPositions>,
     motor_angles: Res<MotorAngles>,
     mut last_joint_data: ResMut<LastJointData>,
 ) {

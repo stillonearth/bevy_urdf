@@ -51,10 +51,10 @@ bevy = { version = "0.17", default-features = false, features = [
     "png",
     "zstd_rust",
 ] }
-bevy_flycam = { git = "https://github.com/kSDOT/bevy_flycam.git", rev = "a6f36a" }
-bevy-inspector-egui = "0.32"
+bevy_flycam = { git = "https://github.com/stillonearth/bevy_flycam.git", rev = "aee5ff6" }
+bevy-inspector-egui = "0.34.0"
 actix-web = "4.4"
 tokio = { version = "1.0", features = ["full"] }
 env_logger = "0.10"
-bevy_infinite_grid = { git = "https://github.com/ForesightMiningSoftwareCorporation/bevy_infinite_grid", branch = "main" }
-bevy_panorbit_camera = { version = "0.27", features = ["bevy_egui"] }
+# bevy_infinite_grid = { git = "https://github.com/ForesightMiningSoftwareCorporation/bevy_infinite_grid", branch = "main" }
+bevy_panorbit_camera = { version = "0.29", features = ["bevy_egui"] }

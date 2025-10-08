@@ -3,7 +3,7 @@ use bevy::{
     color::palettes::css::WHITE, input::common_conditions::input_toggle_active, prelude::*,
 };
 use bevy_flycam::prelude::*;
-use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
+// use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_obj::ObjPlugin;
@@ -50,28 +50,28 @@ fn main() {
             DefaultPlugins,
             StlPlugin,
             ObjPlugin,
-            FlyCameraPlugin {
-                spawn_camera: true,
-                grab_cursor_on_startup: true,
-            },
+            PlayerPlugin,
             RapierPhysicsPlugin::<NoUserData>::default(),
-            URDFPlugin::default().with_default_system_setup(true),
-            EguiPlugin {
-                enable_multipass_for_primary_context: true,
+            URDFPlugin {
+                default_system_setup: false,
+                ..default()
             },
-            InfiniteGridPlugin,
+            EguiPlugin { ..default() },
+            // InfiniteGridPlugin,
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
         ))
+        .add_systems(
+            Update,
+            (
+                URDFPlugin::<NoUserData>::get_systems(PhysicsSet::SyncBackend)
+                    .in_set(PhysicsSet::SyncBackend),
+                URDFPlugin::<NoUserData>::get_systems(PhysicsSet::StepSimulation)
+                    .in_set(PhysicsSet::StepSimulation),
+                URDFPlugin::<NoUserData>::get_systems(PhysicsSet::Writeback)
+                    .in_set(PhysicsSet::Writeback),
+            ),
+        )
         .init_state::<AppState>()
-        .insert_resource(MovementSettings {
-            move_speed: Vec3::ONE * 3.0,
-        })
-        .insert_resource(MouseSettings {
-            invert_horizontal: false,
-            invert_vertical: false,
-            mouse_sensitivity: 0.00012,
-            lock_cursor_to_middle: false,
-        })
         .insert_resource(QuadcopterController(controller))
         .insert_resource(ClearColor(Color::linear_rgb(1.0, 1.0, 1.0)))
         .insert_resource(UrdfRobotHandle(None))
@@ -92,8 +92,8 @@ struct Crazyflie;
 
 fn start_simulation(
     mut commands: Commands,
-    mut er_robot_loaded: EventReader<RobotLoaded>,
-    mut ew_spawn_robot: EventWriter<SpawnRobot>,
+    mut er_robot_loaded: MessageReader<RobotLoaded>,
+    mut ew_spawn_robot: MessageWriter<SpawnRobot>,
     mut state: ResMut<NextState<AppState>>,
     q_crazflie: Query<(Entity, &Crazyflie)>,
 ) {
@@ -113,7 +113,7 @@ fn start_simulation(
 
 fn control_thrusts(
     robot_handle: Res<UrdfRobotHandle>,
-    mut ew_control_motors: EventWriter<ControlThrusts>,
+    mut ew_control_motors: MessageWriter<ControlThrusts>,
     mut controller: ResMut<QuadcopterController>,
     q_drone: Query<(Entity, &UAVDescriptor)>,
 ) {
@@ -170,7 +170,7 @@ enum AppState {
 }
 
 #[allow(deprecated)]
-fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
+fn setup(mut commands: Commands, mut ew_load_robot: MessageWriter<LoadRobot>) {
     // scene
     commands.insert_resource(AmbientLight {
         color: WHITE.into(),
@@ -186,16 +186,16 @@ fn setup(mut commands: Commands, mut ew_load_robot: EventWriter<LoadRobot>) {
 
     // ground
     commands.spawn((
-        InfiniteGridBundle {
-            transform: Transform::from_xyz(0.0, -1.0, 0.0),
-            ..default()
-        },
+        // InfiniteGridBundle {
+        //     transform: Transform::from_xyz(0.0, -1.0, 0.0),
+        //     ..default()
+        // },
         RigidBody::Fixed,
         Collider::cuboid(900., 0.05, 900.),
     ));
 
     // load robot
-    ew_load_robot.send(LoadRobot {
+    ew_load_robot.write(LoadRobot {
         robot_type: RobotType::Other,
         urdf_path: "quadrotors/crazyflie/cf2x.urdf".to_string(),
         mesh_dir: "assets/quadrotors/crazyflie/".to_string(),
