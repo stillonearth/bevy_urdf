@@ -3,7 +3,7 @@ use bevy::{
     color::palettes::css::WHITE, input::common_conditions::input_toggle_active, prelude::*,
 };
 use bevy_flycam::prelude::*;
-// use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
+use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_obj::ObjPlugin;
@@ -24,19 +24,10 @@ fn main() {
             RapierPhysicsPlugin::<NoUserData>::default(),
             URDFPlugin::default().with_default_system_setup(true),
             EguiPlugin { ..default() },
-            // InfiniteGridPlugin,
+            InfiniteGridPlugin,
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
         ))
         .init_state::<AppState>()
-        // .insert_resource(MovementSettings {
-        //     move_speed: Vec3::ONE * 3.0,
-        // })
-        // .insert_resource(MouseSettings {
-        //     invert_horizontal: false,
-        //     invert_vertical: false,
-        //     mouse_sensitivity: 0.00012,
-        //     lock_cursor_to_middle: false,
-        // })
         .insert_resource(ClearColor(Color::linear_rgb(1.0, 1.0, 1.0)))
         .insert_resource(UrdfRobotHandle(None))
         .add_systems(Startup, setup)
@@ -96,10 +87,10 @@ fn setup(mut commands: Commands, mut ew_load_robot: MessageWriter<LoadRobot>) {
     });
 
     commands.spawn((
-        // InfiniteGridBundle {
-        //     transform: Transform::from_xyz(0.0, -1.0, 0.0),
-        //     ..default()
-        // },
+        InfiniteGridBundle {
+            transform: Transform::from_xyz(0.0, -1.0, 0.0),
+            ..default()
+        },
         RigidBody::Fixed,
         Collider::cuboid(900., 0.05, 900.),
     ));

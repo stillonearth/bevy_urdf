@@ -1,8 +1,11 @@
 use bevy::input::common_conditions::input_toggle_active;
 use bevy::{color::palettes::css::WHITE, prelude::*};
-// use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
-use bevy_inspector_egui::bevy_egui::EguiPlugin;
-use bevy_inspector_egui::bevy_egui::{egui, EguiContexts};
+use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
+use bevy_inspector_egui::bevy_egui::{
+    egui, EguiContexts, EguiPrimaryContextPass, PrimaryEguiContext,
+};
+use bevy_inspector_egui::bevy_egui::{EguiContext, EguiPlugin};
+use bevy_inspector_egui::prelude::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_panorbit_camera::*;
 use bevy_rapier3d::prelude::*;
@@ -47,7 +50,7 @@ fn main() {
             PanOrbitCameraPlugin,
             RapierPhysicsPlugin::<NoUserData>::default(),
             EguiPlugin::default(),
-            // InfiniteGridPlugin,
+            InfiniteGridPlugin,
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
         ))
         .init_state::<AppState>()
@@ -76,7 +79,7 @@ fn main() {
             )
                 .run_if(in_state(AppState::Simulation)),
         )
-        // .add_systems((control_motors, motor_ui).chain())
+        .add_systems(EguiPrimaryContextPass, inspector_ui)
         .run();
 }
 
@@ -118,10 +121,10 @@ fn setup(mut commands: Commands, mut ew_load_robot: MessageWriter<LoadRobot>) {
 
     // ground
     commands.spawn((
-        // InfiniteGridBundle {
-        //     transform: Transform::from_xyz(0.0, -1.0, 0.0),
-        //     ..default()
-        // },
+        InfiniteGridBundle {
+            transform: Transform::from_xyz(0.0, -1.0, 0.0),
+            ..default()
+        },
         RigidBody::Fixed,
         Collider::cuboid(900., 0.05, 900.),
     ));
@@ -217,54 +220,62 @@ fn initialize_motors(
     }
 }
 
-fn motor_ui(mut contexts: EguiContexts, mut motor_angles: ResMut<MotorAngles>) {
+fn inspector_ui(world: &mut World) {
+    let Ok(ctx) = world
+        .query_filtered::<&mut EguiContext, With<PrimaryEguiContext>>()
+        .single_mut(world)
+    else {
+        return;
+    };
+    let mut egui_context = ctx.clone();
+
+    let mut motor_angles = world.resource_mut::<MotorAngles>();
+
     if !motor_angles.initialized || motor_angles.angles.is_empty() {
         return;
     }
 
-    if let Ok(ctx) = contexts.ctx_mut() {
-        let mut angles_changed = false;
+    let mut angles_changed = false;
 
-        egui::Window::new("Motor Control")
-            .default_pos(egui::pos2(20.0, 20.0))
-            .default_size(egui::vec2(400.0, 500.0))
-            .resizable(true)
-            .collapsible(true)
-            .show(ctx, |ui| {
-                let motor_count = motor_angles.angles.len();
-                ui.heading(format!("Motor Control ({} motors)", motor_count));
+    egui::Window::new("Motor Control")
+        .default_pos(egui::pos2(20.0, 20.0))
+        .default_size(egui::vec2(400.0, 500.0))
+        .resizable(true)
+        .collapsible(true)
+        .show(egui_context.get_mut(), |ui| {
+            let motor_count = motor_angles.angles.len();
+            ui.heading(format!("Motor Control ({} motors)", motor_count));
 
-                for MotorAngle {
-                    name,
-                    lower_limit,
-                    upper_limit,
-                    angle,
-                } in motor_angles.angles.iter_mut()
-                {
-                    let min_limit = *lower_limit;
-                    let max_limit = *upper_limit;
-                    let old_value = *angle;
+            for MotorAngle {
+                name,
+                lower_limit,
+                upper_limit,
+                angle,
+            } in motor_angles.angles.iter_mut()
+            {
+                let min_limit = *lower_limit;
+                let max_limit = *upper_limit;
+                let old_value = *angle;
 
-                    ui.horizontal(|ui| {
-                        ui.label(format!("{}: ", name));
-                        let response = ui.add(
-                            egui::Slider::new(angle, min_limit..=max_limit)
-                                .text("rad")
-                                .step_by(0.01),
-                        );
-                        ui.label(format!("{:.3}", angle));
+                ui.horizontal(|ui| {
+                    ui.label(format!("{}: ", name));
+                    let response = ui.add(
+                        egui::Slider::new(angle, min_limit..=max_limit)
+                            .text("rad")
+                            .step_by(0.01),
+                    );
+                    ui.label(format!("{:.3}", angle));
 
-                        if response.changed() || (old_value - *angle).abs() > 0.001 {
-                            angles_changed = true;
-                        }
-                    });
-                }
+                    if response.changed() || (old_value - *angle).abs() > 0.001 {
+                        angles_changed = true;
+                    }
+                });
+            }
 
-                if angles_changed {
-                    motor_angles.set_changed();
-                }
-            });
-    }
+            if angles_changed {
+                motor_angles.set_changed();
+            }
+        });
 }
 
 fn control_motors(

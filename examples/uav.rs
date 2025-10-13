@@ -3,7 +3,7 @@ use bevy::{
     color::palettes::css::WHITE, input::common_conditions::input_toggle_active, prelude::*,
 };
 use bevy_flycam::prelude::*;
-// use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
+use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_obj::ObjPlugin;
@@ -57,7 +57,7 @@ fn main() {
                 ..default()
             },
             EguiPlugin { ..default() },
-            // InfiniteGridPlugin,
+            InfiniteGridPlugin,
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
         ))
         .add_systems(
@@ -186,10 +186,10 @@ fn setup(mut commands: Commands, mut ew_load_robot: MessageWriter<LoadRobot>) {
 
     // ground
     commands.spawn((
-        // InfiniteGridBundle {
-        //     transform: Transform::from_xyz(0.0, -1.0, 0.0),
-        //     ..default()
-        // },
+        InfiniteGridBundle {
+            transform: Transform::from_xyz(0.0, -1.0, 0.0),
+            ..default()
+        },
         RigidBody::Fixed,
         Collider::cuboid(900., 0.05, 900.),
     ));
