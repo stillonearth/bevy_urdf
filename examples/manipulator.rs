@@ -1,11 +1,8 @@
 use bevy::input::common_conditions::input_toggle_active;
 use bevy::{color::palettes::css::WHITE, prelude::*};
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
-use bevy_inspector_egui::bevy_egui::{
-    egui, EguiContexts, EguiPrimaryContextPass, PrimaryEguiContext,
-};
+use bevy_inspector_egui::bevy_egui::{egui, EguiPrimaryContextPass, PrimaryEguiContext};
 use bevy_inspector_egui::bevy_egui::{EguiContext, EguiPlugin};
-use bevy_inspector_egui::prelude::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_panorbit_camera::*;
 use bevy_rapier3d::prelude::*;
@@ -51,7 +48,7 @@ fn main() {
             RapierPhysicsPlugin::<NoUserData>::default(),
             EguiPlugin::default(),
             InfiniteGridPlugin,
-            WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
+            WorldInspectorPlugin::default(),
         ))
         .init_state::<AppState>()
         .insert_resource(ClearColor(Color::linear_rgb(1.0, 1.0, 1.0)))

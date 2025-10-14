@@ -24,14 +24,14 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            URDFPlugin::default(),
+            URDFPlugin { ..default() },
             StlPlugin,
             PlayerPlugin,
             RapierPhysicsPlugin::<NoUserData>::default(),
-            EguiPlugin { ..default() },
             InfiniteGridPlugin,
-            WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)),
         ))
+        .add_plugins(EguiPlugin::default())
+        .add_plugins(WorldInspectorPlugin::default())
         .init_state::<AppState>()
         .insert_resource(ClearColor(Color::linear_rgb(1.0, 1.0, 1.0)))
         .insert_resource(UrdfRobotHandle(None))
@@ -89,19 +89,19 @@ fn check_rapier_state(
         || simulation_step_counter.0 == 100
         || simulation_step_counter.0 == 300
     {
-        println!("----");
-        println!("step {}", simulation_step_counter.0);
-        for (_, _simulation, rigid_body_set, colliders, joints) in q_rapier_context.iter() {
-            let rbl = rigid_body_set.bodies.len();
-            let cl = colliders.colliders.len();
-            let mbjl = joints.multibody_joints.iter().count();
-            let ijl = joints.impulse_joints.len();
+        // println!("----");
+        // println!("step {}", simulation_step_counter.0);
+        // for (_, _simulation, rigid_body_set, colliders, joints) in q_rapier_context.iter() {
+        //     let rbl = rigid_body_set.bodies.len();
+        //     let cl = colliders.colliders.len();
+        //     let mbjl = joints.multibody_joints.iter().count();
+        //     let ijl = joints.impulse_joints.len();
 
-            println!("rigid bodies: {rbl}");
-            println!("colliders: {cl}");
-            println!("multibody joints: {mbjl}");
-            println!("impulse joints: {ijl}");
-        }
+        //     println!("rigid bodies: {rbl}");
+        //     println!("colliders: {cl}");
+        //     println!("multibody joints: {mbjl}");
+        //     println!("impulse joints: {ijl}");
+        // }
     }
 
     if simulation_step_counter.0 == 5000 {
@@ -116,33 +116,33 @@ fn robot_lifecycle(
     mut er_despawn_robot: MessageWriter<DespawnRobot>,
 ) {
     for event in er_sensors_read.read() {
-        println!("Step {}", simulation_step_counter.0);
-        println!("Robot: {:?}", event.handle.id());
-        println!("\transforms:");
-        for transform in &event.transforms {
-            let trans = transform.translation;
-            let rot = transform.rotation;
-            println!(
-                "\t{} {} {} {} {} {} {}",
-                trans.x, trans.y, trans.z, rot.x, rot.y, rot.z, rot.w
-            );
-        }
+        // println!("Step {}", simulation_step_counter.0);
+        // println!("Robot: {:?}", event.handle.id());
+        // println!("\transforms:");
+        // for transform in &event.transforms {
+        //     let trans = transform.translation;
+        //     let rot = transform.rotation;
+        //     println!(
+        //         "\t{} {} {} {} {} {} {}",
+        //         trans.x, trans.y, trans.z, rot.x, rot.y, rot.z, rot.w
+        //     );
+        // }
 
-        let joint_angles_string: Vec<String> =
-            event.joint_angles.iter().map(|a| a.to_string()).collect();
-        println!("\tjoint_angles:");
-        println!("\t{}", joint_angles_string.join(" "));
-        println!("------------------------------------");
+        // let joint_angles_string: Vec<String> =
+        //     event.joint_angles.iter().map(|a| a.to_string()).collect();
+        // println!("\tjoint_angles:");
+        // println!("\t{}", joint_angles_string.join(" "));
+        // println!("------------------------------------");
 
-        if robot_handle.0.clone().is_some() {
-            simulation_step_counter.0 += 1;
+        // if robot_handle.0.clone().is_some() {
+        //     simulation_step_counter.0 += 1;
 
-            if simulation_step_counter.0 == 5000 {
-                er_despawn_robot.write(DespawnRobot {
-                    handle: event.handle.clone(),
-                });
-            }
-        }
+        //     if simulation_step_counter.0 == 5000 {
+        //         er_despawn_robot.write(DespawnRobot {
+        //             handle: event.handle.clone(),
+        //         });
+        //     }
+        // }
     }
 }
 
