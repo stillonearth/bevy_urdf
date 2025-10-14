@@ -123,7 +123,7 @@ impl AssetLoader for RpyAssetLoader {
                 create_colliders_from_collision_shapes: settings
                     .create_colliders_from_collision_shapes,
                 enable_joint_collisions: false,
-                apply_imported_mass_props: true,
+                apply_imported_mass_props: false,
                 make_roots_fixed: settings.make_roots_fixed,
                 shift: Isometry::rotation(-Vector::x() * std::f32::consts::FRAC_PI_2),
                 ..Default::default()
