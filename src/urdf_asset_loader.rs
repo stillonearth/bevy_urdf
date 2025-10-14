@@ -112,31 +112,6 @@ impl AssetLoader for RpyAssetLoader {
             urdf_robot.links = robot_links;
         }
 
-        let mut robot_links = urdf_robot.links.clone();
-        for (body_index, urdf_link) in robot_links.clone().iter().enumerate() {
-            for (collider_index, collider) in urdf_link.colliders.clone().iter().enumerate() {
-                let mut collider = collider.clone();
-                let urdf_interactions_groups = collider.collision_groups();
-
-                collider.set_density(10.0);
-                collider.set_mass(10000.0);
-
-                println!(
-                    "collider: {:?} groups: {:?}",
-                    collider, urdf_interactions_groups
-                );
-
-                robot_links[body_index].colliders[collider_index] = collider;
-
-                // adjusted_interaction_groups.filter = urdf_interactions_groups.filter;
-
-                // collider.set_collision_groups(adjusted_interaction_groups);
-                // robot_links[body_index].colliders[collider_index] = collider;
-            }
-        }
-
-        urdf_robot.links = robot_links;
-
         // fix joint positions
         let kinematic_isometry = isometry.clone();
         let kinematic_transforms = get_link_transforms(&mut robot, kinematic_isometry).unwrap();

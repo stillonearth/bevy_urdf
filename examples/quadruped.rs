@@ -150,7 +150,6 @@ fn control_motors(
     robot_handle: Res<UrdfRobotHandle>,
     mut ew_control_motors: MessageWriter<ControlMotorVelocities>,
 ) {
-    return;
     if let Some(handle) = robot_handle.0.clone() {
         let mut rng = rand::rng();
         let mut velocities: Vec<f32> = Vec::new();
