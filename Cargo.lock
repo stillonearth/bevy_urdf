@@ -814,7 +814,7 @@ dependencies = [
 [[package]]
 name = "bevy_infinite_grid"
 version = "0.17.0"
-source = "git+https://github.com/AllenDang/bevy_infinite_grid.git?rev=e157d19#e157d19b3534019b521f5267b237942ba2be43ce"
+source = "git+https://github.com/AllenDang/bevy_infinite_grid.git?rev=d08d252#d08d2525233fd75e8886b8bd71b3ac9be55973d1"
 dependencies = [
  "bevy",
 ]
@@ -1014,9 +1014,9 @@ dependencies = [
 
 [[package]]
 name = "bevy_panorbit_camera"
-version = "0.30.0"
+version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "057cb19462b764c6a76081d1c901d7c2f6e67a13c9f450ab30d35bda3f6926ab"
+checksum = "096f90f6da63218827d94f13a65c5e3db7ad612ce56043fdbaba03923724e060"
 dependencies = [
  "bevy",
 ]

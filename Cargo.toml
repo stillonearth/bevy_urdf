@@ -56,5 +56,5 @@ bevy = { version = "0.17", default-features = false, features = [
 bevy_flycam = { git = "https://github.com/stillonearth/bevy_flycam.git", rev = "aee5ff6" }
 bevy-inspector-egui = "0.34"
 env_logger = "0.11.8"
-bevy_infinite_grid = { git = "https://github.com/AllenDang/bevy_infinite_grid.git", rev = "e157d19" }
-bevy_panorbit_camera = "0.30"
+bevy_infinite_grid = { git = "https://github.com/AllenDang/bevy_infinite_grid.git", rev = "d08d252" }
+bevy_panorbit_camera = "0.33"

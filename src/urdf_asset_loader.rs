@@ -75,6 +75,7 @@ impl AssetLoader for RpyAssetLoader {
             apply_imported_mass_props: true,
             make_roots_fixed: settings.make_roots_fixed,
             shift: isometry,
+            collider_blueprint: ColliderBuilder::default().density(1.0),
             ..Default::default()
         };
 
@@ -123,7 +124,7 @@ impl AssetLoader for RpyAssetLoader {
                 create_colliders_from_collision_shapes: settings
                     .create_colliders_from_collision_shapes,
                 enable_joint_collisions: false,
-                apply_imported_mass_props: false,
+                apply_imported_mass_props: true,
                 make_roots_fixed: settings.make_roots_fixed,
                 shift: Isometry::rotation(-Vector::x() * std::f32::consts::FRAC_PI_2),
                 ..Default::default()
