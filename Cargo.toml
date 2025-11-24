@@ -9,14 +9,14 @@ repository = "https://github.com/stillonearth/bevy_urdf"
 
 [dependencies]
 anyhow = "1.0"
-bevy = { version = "0.17", default-features = false, features = [
+bevy = { version = "0.17.3", default-features = false, features = [
     "bevy_asset",
     "bevy_render",
     "png",
 ] }
-rapier3d-urdf = { version = "0.10", features = ["stl", "wavefront"] }
-rapier3d = { version = "0.29", features = ["serde-serialize"] }
-bevy_rapier3d = { git = "https://github.com/lukasfri/bevy_rapier.git", branch = "master", features = [
+rapier3d-urdf = { version = "0.12", features = ["stl", "wavefront"] }
+rapier3d = { version = "0.31", features = ["serde-serialize"] }
+bevy_rapier3d = { git = "https://github.com/dimforge/bevy_rapier.git", rev = "f15ff6b", features = [
     "simd-stable",
     "serde-serialize",
     "debug-render-3d"
@@ -53,8 +53,8 @@ bevy = { version = "0.17", default-features = false, features = [
     "png",
     "zstd_rust",
 ] }
-bevy_flycam = { git = "https://github.com/stillonearth/bevy_flycam.git", rev = "aee5ff6" }
+bevy_flycam = "0.17"
 bevy-inspector-egui = "0.34"
 env_logger = "0.11.8"
-bevy_infinite_grid = { git = "https://github.com/AllenDang/bevy_infinite_grid.git", rev = "d08d252" }
+bevy_infinite_grid = "0.17"
 bevy_panorbit_camera = "0.33"
