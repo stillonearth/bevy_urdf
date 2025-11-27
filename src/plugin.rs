@@ -24,9 +24,9 @@ pub fn rapier_to_bevy_rotation() -> Quat {
 
 use crate::{
     control::{
-        handle_control_motor_positions, handle_control_motor_velocities, ControlFins,
-        ControlMotorPositions, ControlMotorVelocities, ControlThrusters, SensorsRead,
-        UAVStateUpdate, UUVStateUpdate,
+        handle_control_motor_positions, handle_control_motor_velocities, handle_control_motors,
+        ControlFins, ControlMotorPositions, ControlMotorVelocities, ControlMotors,
+        ControlThrusters, SensorsRead, UAVStateUpdate, UUVStateUpdate,
     },
     spawn::{
         handle_despawn_robot, handle_load_robot, handle_spawn_robot, handle_wait_robot_loaded,
@@ -66,6 +66,7 @@ where
             PhysicsSet::SyncBackend => (
                 handle_control_motor_velocities,
                 handle_control_motor_positions,
+                handle_control_motors,
                 handle_control_thrusts,
                 handle_control_thrusters,
                 handle_control_fins,
@@ -103,6 +104,7 @@ impl Plugin for URDFPlugin {
         app.init_asset_loader::<urdf_asset_loader::RpyAssetLoader>()
             .add_message::<ControlMotorVelocities>()
             .add_message::<ControlMotorPositions>()
+            .add_message::<ControlMotors>()
             .add_message::<ControlThrusts>()
             .add_message::<ControlThrusters>()
             .add_message::<ControlFins>()
