@@ -179,21 +179,44 @@ fn initialize_motors(
                     | urdf_rs::JointType::Continuous
                     | urdf_rs::JointType::Prismatic => {
                         let limit = &joint.limit;
-                        let mut lower = limit.lower as f32;
-                        let mut upper = limit.upper as f32;
+                        // limits are incorrect here
+                        let mut lower = 3.0 * limit.lower as f32;
+                        let mut upper = 3.0 * limit.upper as f32;
 
-                        if (lower - upper).abs() < 0.001 {
-                            lower = -PI;
-                            upper = PI;
+                        // joint.limit.effort = 1.
+
+                        // if (lower - upper).abs() < 0.001 {
+                        //     lower = -PI;
+                        //     upper = PI;
+                        // }
+
+                        if i == 3 {
+                            lower = -16.0;
+                            upper = 0.0;
+                        }
+
+                        if i == 4 {
+                            lower = 0.0;
+                            upper = 16.0;
+                        }
+
+                        if i == 5 {
+                            lower = -16.0;
+                            upper = 0.0;
+                        }
+
+                        if i == 6 {
+                            // lower = -5.0;
+                            // upper = -1.6;
                         }
 
                         let angle: f32 = match i {
                             1 => 0.0, // (-0.174533 + 1.74533) / 2.0,
                             2 => (-2.74385 + 2.84121) / 2.0,
                             3 => (-1.65806 + 1.65806) / 2.0,
-                            4 => (-1.69 + 1.69) / 2.0,
-                            5 => (-1.74533 + 1.74533) / 2.0,
-                            6 => 3.14, //(-1.41986 - 1.11986) / 2.0 + 1.0,
+                            4 => 1.57,  //(-1.69 + 1.69) / 2.0,
+                            5 => -1.57, //(-1.74533 + 1.74533) / 2.0,
+                            6 => 3.14,  //(-1.41986 - 1.11986) / 2.0 + 1.0,
                             _ => 1.0,
                         };
                         info!("{} {} rad(type: {:?})", joint.name, angle, joint.joint_type);

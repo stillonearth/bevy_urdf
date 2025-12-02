@@ -34,6 +34,8 @@ uav = { version = "0.2.0" }
 roxmltree = "0.21"
 queues = "1.0.2"
 k = "0.32"
+rerun = "0.27.2"
+const_format = "0.2.35"
 
 [patch.crates-io]
 fast_ode = { path = "patches/fast_ode-1.0.0" }
